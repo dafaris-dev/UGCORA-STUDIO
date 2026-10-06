@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{% block title %}UGCORA Studio{% endblock %}</title>
   <link rel="stylesheet" href="/static/css/style.css" />
+  <script>
+    // Apply saved theme before paint to avoid flash
+    try {
+      var t = localStorage.getItem('ugcora_theme');
+      if (t === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    } catch(_) {}
+  </script>
 </head>
 <body class="theme-dark">
   {% if request.session.get('user') %}

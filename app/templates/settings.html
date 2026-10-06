@@ -1,71 +1,271 @@
 {% extends "base.html" %}
-{% block title %}Settings — UGCORA{% endblock %}
+{% block title %}Settings — UGCORA Studio{% endblock %}
 {% block content %}
 <header class="page-header">
-  <h1>Settings</h1>
-  <p class="muted">AI providers, video, voice, storage, security.</p>
+  <div>
+    <div class="eyebrow">CONFIGURATION</div>
+    <h1>Settings</h1>
+    <p class="muted">Semua key disimpan di database lokal (<span class="mono-small">data/ugcora.db</span>) di komputer kamu. Tidak ada yang keluar.</p>
+  </div>
 </header>
 
-<form class="form card" action="/api/settings" method="post" onsubmit="return submitSettings(event, this)">
-  <h2>Google Gemini</h2>
-  <label>API Key</label>
-  <input name="GEMINI_API_KEY" placeholder="{{ settings.GEMINI_API_KEY or 'paste your key' }}" />
-  <small class="muted">Leave blank to keep current value. Current: {{ settings.GEMINI_API_KEY or 'not set' }}</small>
-  <label>Model</label>
-  <input name="GEMINI_MODEL" value="{{ settings.GEMINI_MODEL }}" placeholder="gemini-2.0-flash" />
-  <button type="button" class="btn btn-ghost" onclick="testProvider('gemini')">Test Gemini Connection</button>
-  <p id="gemini-status" class="small"></p>
+<div class="card setting-row">
+  <div>
+    <h3>🎨 Tampilan</h3>
+    <p class="small">Pilih tema terang atau gelap. Kesimpen otomatis di browser kamu.</p>
+  </div>
+  <div class="toggle-pair" role="radiogroup">
+    <button class="toggle" type="button" data-theme-set="light">☀ Light</button>
+    <button class="toggle active" type="button" data-theme-set="dark">🌙 Dark</button>
+  </div>
+</div>
 
-  <h2>NVIDIA</h2>
-  <label>API Key</label>
-  <input name="NVIDIA_API_KEY" placeholder="{{ settings.NVIDIA_API_KEY or 'paste your key' }}" />
-  <small class="muted">Current: {{ settings.NVIDIA_API_KEY or 'not set' }}</small>
-  <label>Model</label>
-  <input name="NVIDIA_MODEL" value="{{ settings.NVIDIA_MODEL }}" placeholder="e.g. nvidia/cosmos-1" />
-  <label>Base URL</label>
-  <input name="NVIDIA_BASE_URL" value="{{ settings.NVIDIA_BASE_URL }}" placeholder="https://integrate.api.nvidia.com/v1" />
-  <button type="button" class="btn btn-ghost" onclick="testProvider('nvidia')">Test NVIDIA Connection</button>
-  <p id="nvidia-status" class="small"></p>
+<div class="tabs">
+  <button class="tab active" type="button" data-tab="koneksi">🔌 Koneksi</button>
+  <button class="tab" type="button" data-tab="preferensi">⚙ Preferensi</button>
+</div>
 
-  <h2>Video Provider</h2>
-  <label>Selected Provider</label>
-  <select name="VIDEO_PROVIDER">
-    <option value="nvidia" {% if settings.VIDEO_PROVIDER == 'nvidia' %}selected{% endif %}>NVIDIA</option>
-  </select>
+<form id="settings-form" method="post" action="/api/settings" onsubmit="return saveSettings(event, this)">
 
-  <h2>Voice Provider</h2>
-  <label>Selected Provider</label>
-  <select name="VOICE_PROVIDER">
-    <option value="none" {% if settings.VOICE_PROVIDER == 'none' %}selected{% endif %}>None</option>
-  </select>
+  <!-- TAB: Koneksi -->
+  <div class="tab-pane active" data-pane-tab="koneksi">
+    {% for section in sections %}
+    <div class="card setting-group">
+      <div class="group-head">
+        <div>
+          <h2>{{ section.name }}</h2>
+          <p class="small">{{ section.desc }}</p>
+        </div>
+        {% if section.default_key %}
+        <div class="group-default">
+          <label class="field inline">Pilih default</label>
+          <select name="{{ section.default_key }}">
+            <option value="">— pilih —</option>
+            {% for p in section.providers %}
+              <option value="{{ p.key }}" {% if section.default_value == p.key %}selected{% endif %}>{{ p.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+      </div>
 
-  <div class="actions">
-    <button class="btn btn-primary" type="submit">Save Settings</button>
+      {% for p in section.providers %}
+      <div class="provider">
+        <div class="prov-head">
+          <div class="prov-title">
+            <h3>{{ p.name }}</h3>
+            {% if p.badge %}
+              <span class="badge {{ p.badge.kind }}">{{ p.badge.label }}</span>
+            {% endif %}
+          </div>
+          {% if p.status.configured %}
+            <span class="pill ok dot">terpasang</span>
+          {% else %}
+            <span class="pill warn dot">belum diset</span>
+          {% endif %}
+        </div>
+
+        {% if not p.get('no_key') %}
+        <div class="prov-grid">
+          <div>
+            <label class="field">API Key</label>
+            <input type="password" name="{{ p.key|upper }}_API_KEY"
+                   placeholder="{% if p.status.api_key_mask %}{{ p.status.api_key_mask }} — kosongin buat tetap pakai{% else %}paste key di sini{% endif %}">
+            {% for f in p.get('fields', []) %}
+              <label class="field">{{ f.label }}</label>
+              {% if f.kind == 'textarea' %}
+                <textarea name="{{ p.key|upper }}_{{ f.name|upper }}" rows="3"
+                          placeholder="(udah diset — kosongin buat tetap pakai)">{% if not p.status.field_values[f.name] %}{% endif %}</textarea>
+              {% elif f.kind == 'password' %}
+                <input type="password" name="{{ p.key|upper }}_{{ f.name|upper }}"
+                       placeholder="(udah diset — kosongin buat tetap pakai)">
+              {% else %}
+                <input type="text" name="{{ p.key|upper }}_{{ f.name|upper }}"
+                       value="{{ p.status.field_values[f.name] or f.get('default','') }}"
+                       placeholder="{{ f.get('default','') }}">
+              {% endif %}
+            {% endfor %}
+          </div>
+          {% if p.get('models') %}
+          <div>
+            <label class="field">Model Default</label>
+            <select name="{{ p.key|upper }}_MODEL">
+              <option value="">— pilih model —</option>
+              {% for m in p.models %}
+                <option value="{{ m }}" {% if p.status.model == m %}selected{% endif %}>{{ m }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
+        </div>
+        <label class="prov-reset">
+          <input type="checkbox" name="reset" value="{{ p.key|upper }}_API_KEY">
+          Hapus key ini (reset ke kosong — buat ganti / test key lain)
+        </label>
+
+        {% else %}
+          {# Storage providers w/o single API key — show extra fields full-width #}
+          <div class="prov-grid single">
+            <div>
+              {% for f in p.get('fields', []) %}
+                <label class="field">{{ f.label }}</label>
+                {% if f.kind == 'textarea' %}
+                  <textarea name="{{ p.key|upper }}_{{ f.name|upper }}" rows="4"
+                            placeholder="(udah diset — kosongin buat tetap pakai)"></textarea>
+                {% elif f.kind == 'password' %}
+                  <input type="password" name="{{ p.key|upper }}_{{ f.name|upper }}"
+                         placeholder="(udah diset — kosongin buat tetap pakai)">
+                {% else %}
+                  <input type="text" name="{{ p.key|upper }}_{{ f.name|upper }}"
+                         value="{{ p.status.field_values[f.name] or '' }}">
+                {% endif %}
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+
+        <div class="prov-help">💡 {{ p.help|safe }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+
+    <div class="actions sticky-actions">
+      <button class="btn btn-primary" type="submit">Save all connections</button>
+    </div>
+  </div>
+
+  <!-- TAB: Preferensi -->
+  <div class="tab-pane" data-pane-tab="preferensi" hidden>
+    <div class="card setting-group">
+      <div class="group-head"><div><h2>⚙ Default Preferensi</h2><p class="small">Nilai awal setiap kali kamu bikin video baru.</p></div></div>
+
+      <div class="pref-row">
+        <div><h3>Default Aspect Ratio</h3><p class="small">Format awal di wizard.</p></div>
+        <select name="DEFAULT_ASPECT" style="max-width:260px">
+          <option value="9:16" {% if preferences.DEFAULT_ASPECT == '9:16' %}selected{% endif %}>9:16 (vertical)</option>
+          <option value="1:1"  {% if preferences.DEFAULT_ASPECT == '1:1'  %}selected{% endif %}>1:1 (square)</option>
+          <option value="16:9" {% if preferences.DEFAULT_ASPECT == '16:9' %}selected{% endif %}>16:9 (landscape)</option>
+        </select>
+      </div>
+
+      <div class="pref-row">
+        <div><h3>Default Duration</h3><p class="small">Panjang video default.</p></div>
+        <select name="DEFAULT_DURATION" style="max-width:260px">
+          {% for d in ['15','30','45','60'] %}
+          <option value="{{ d }}" {% if preferences.DEFAULT_DURATION == d %}selected{% endif %}>{{ d }} seconds</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="pref-row">
+        <div><h3>App Environment</h3><p class="small">"development" mengizinkan demo creators & test tanpa provider sungguhan.</p></div>
+        <select name="APP_ENV" style="max-width:260px">
+          <option value="production"  {% if preferences.APP_ENV == 'production' %}selected{% endif %}>production</option>
+          <option value="development" {% if preferences.APP_ENV == 'development' %}selected{% endif %}>development</option>
+        </select>
+      </div>
+
+      <div class="actions"><button class="btn btn-primary" type="submit">Save preferences</button></div>
+    </div>
   </div>
 </form>
+
+<style>
+.eyebrow { display:inline-block; font-size:11px; letter-spacing:2px; color:var(--accent); text-transform:uppercase; font-weight:600; margin-bottom:4px; }
+.mono-small { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size:12px; color:var(--muted); }
+
+.setting-row { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:16px; flex-wrap:wrap; }
+.setting-group { margin-bottom:16px; padding:20px 22px; }
+.setting-group .group-head { margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:flex-end; gap:14px; flex-wrap:wrap; }
+.setting-group h2 { font-size:16px; margin:0; }
+.group-default { min-width:260px; }
+.field.inline { margin:0 0 4px; }
+
+.tabs { display:flex; gap:4px; border-bottom:1px solid var(--border); margin: 8px 0 20px; }
+.tab {
+  padding:9px 14px; background:transparent; border:0; border-bottom:2px solid transparent;
+  color:var(--muted); font-size:13px; font-weight:500; cursor:pointer; margin-bottom:-1px;
+  display:inline-flex; align-items:center; gap:6px;
+}
+.tab:hover { color:var(--text); }
+.tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+.tab-pane { display:none; }
+.tab-pane.active { display:block; }
+
+.provider { padding:16px 0; border-bottom:1px solid var(--border); }
+.provider:last-child { border-bottom:0; padding-bottom:4px; }
+.provider:first-of-type { padding-top:4px; }
+.prov-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:10px; flex-wrap:wrap; }
+.prov-title { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.prov-title h3 { font-size:15px; margin:0; }
+
+.badge { font-size:9.5px; font-weight:700; letter-spacing:.5px; padding:2px 6px; border-radius:3px;
+  background: rgba(88,193,122,0.15); color: var(--ok); text-transform:uppercase; }
+.badge.paid { background: rgba(228,176,98,0.12); color: var(--accent); }
+.badge.beta { background: rgba(224,163,95,0.12); color: var(--warn); }
+.badge.free { background: rgba(88,193,122,0.15); color: var(--ok); }
+.badge.default { background: rgba(228,176,98,0.12); color: var(--accent); }
+
+.prov-grid { display:grid; grid-template-columns: 1fr 240px; gap:14px; align-items:start; }
+.prov-grid.single { grid-template-columns: 1fr; }
+@media (max-width: 760px) { .prov-grid { grid-template-columns: 1fr; } }
+.prov-help { font-size:11.5px; color:var(--muted); margin-top:10px; }
+.prov-reset { font-size:11px; color:var(--muted); display:inline-flex; align-items:center; gap:6px; margin-top:8px; cursor:pointer; }
+.prov-reset input { width:auto; margin:0; }
+
+.toggle-pair { display:inline-flex; background:var(--bg); border:1px solid var(--border); border-radius:999px; padding:3px; gap:3px; }
+.toggle { padding:5px 14px; border-radius:999px; background:transparent; border:0; color:var(--muted); font-size:12px; cursor:pointer; }
+.toggle.active { background:var(--accent); color:#1a1a1f; font-weight:600; }
+
+.pref-row { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:14px 0; border-bottom:1px solid var(--border); flex-wrap:wrap; }
+.pref-row:last-of-type { border-bottom:0; }
+.pref-row h3 { font-size:14px; margin:0; }
+
+.sticky-actions { position:sticky; bottom:12px; background:var(--bg); padding:12px; border-radius:10px; border:1px solid var(--border); margin-top:16px; }
+</style>
 {% endblock %}
+
 {% block scripts %}
 <script>
-async function testProvider(name) {
-  const el = document.getElementById(name + '-status');
-  el.textContent = 'Testing…';
-  const resp = await fetch(`/api/providers/${name}/test`, { method: 'POST' });
-  const d = await resp.json();
-  if (d.ok) {
-    el.textContent = 'Connected · ' + (d.model || '') + (d.supports_video !== undefined ? ` · video=${d.supports_video}` : '');
-    el.className = 'small status ok';
-  } else {
-    el.textContent = 'Failed: ' + (d.error || 'unknown');
-    el.className = 'small status warn';
-  }
-}
+// Tabs
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === t));
+    const target = t.dataset.tab;
+    document.querySelectorAll('.tab-pane').forEach(p => {
+      const match = p.dataset.paneTab === target;
+      p.classList.toggle('active', match);
+      p.hidden = !match;
+    });
+  });
+});
 
-async function submitSettings(e, form) {
+// Theme toggle
+const THEME_KEY = 'ugcora_theme';
+function applyTheme(t) {
+  if (t === 'light') document.documentElement.setAttribute('data-theme', 'light');
+  else document.documentElement.removeAttribute('data-theme');
+  document.querySelectorAll('[data-theme-set]').forEach(b => b.classList.toggle('active', b.dataset.themeSet === t));
+  try { localStorage.setItem(THEME_KEY, t); } catch(_) {}
+}
+document.querySelectorAll('[data-theme-set]').forEach(b => b.addEventListener('click', () => applyTheme(b.dataset.themeSet)));
+try { const saved = localStorage.getItem(THEME_KEY); if (saved) applyTheme(saved); } catch(_) {}
+
+async function saveSettings(e, form) {
   e.preventDefault();
   const fd = new FormData(form);
   const resp = await fetch(form.action, { method: 'POST', body: fd });
-  if (resp.ok) { alert('Settings saved.'); window.location.reload(); }
-  else alert('Save failed.');
+  if (resp.ok) {
+    const el = document.createElement('div');
+    el.textContent = '✓ Saved';
+    el.style.cssText = 'position:fixed;bottom:24px;right:24px;background:var(--accent);color:#1a1a1f;padding:10px 16px;border-radius:999px;font-weight:600;z-index:100';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 1800);
+    setTimeout(() => window.location.reload(), 400);
+  } else {
+    alert('Save failed');
+  }
   return false;
 }
 </script>
