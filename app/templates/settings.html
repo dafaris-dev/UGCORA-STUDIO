@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Settings — UGCORA{% endblock %}
+{% block content %}
+<header class="page-header">
+  <h1>Settings</h1>
+  <p class="muted">AI providers, video, voice, storage, security.</p>
+</header>
+
+<form class="form card" action="/api/settings" method="post" onsubmit="return submitSettings(event, this)">
+  <h2>Google Gemini</h2>
+  <label>API Key</label>
+  <input name="GEMINI_API_KEY" placeholder="{{ settings.GEMINI_API_KEY or 'paste your key' }}" />
+  <small class="muted">Leave blank to keep current value. Current: {{ settings.GEMINI_API_KEY or 'not set' }}</small>
+  <label>Model</label>
+  <input name="GEMINI_MODEL" value="{{ settings.GEMINI_MODEL }}" placeholder="gemini-2.0-flash" />
+  <button type="button" class="btn btn-ghost" onclick="testProvider('gemini')">Test Gemini Connection</button>
+  <p id="gemini-status" class="small"></p>
+
+  <h2>NVIDIA</h2>
+  <label>API Key</label>
+  <input name="NVIDIA_API_KEY" placeholder="{{ settings.NVIDIA_API_KEY or 'paste your key' }}" />
+  <small class="muted">Current: {{ settings.NVIDIA_API_KEY or 'not set' }}</small>
+  <label>Model</label>
+  <input name="NVIDIA_MODEL" value="{{ settings.NVIDIA_MODEL }}" placeholder="e.g. nvidia/cosmos-1" />
+  <label>Base URL</label>
+  <input name="NVIDIA_BASE_URL" value="{{ settings.NVIDIA_BASE_URL }}" placeholder="https://integrate.api.nvidia.com/v1" />
+  <button type="button" class="btn btn-ghost" onclick="testProvider('nvidia')">Test NVIDIA Connection</button>
+  <p id="nvidia-status" class="small"></p>
+
+  <h2>Video Provider</h2>
+  <label>Selected Provider</label>
+  <select name="VIDEO_PROVIDER">
+    <option value="nvidia" {% if settings.VIDEO_PROVIDER == 'nvidia' %}selected{% endif %}>NVIDIA</option>
+  </select>
+
+  <h2>Voice Provider</h2>
+  <label>Selected Provider</label>
+  <select name="VOICE_PROVIDER">
+    <option value="none" {% if settings.VOICE_PROVIDER == 'none' %}selected{% endif %}>None</option>
+  </select>
+
+  <div class="actions">
+    <button class="btn btn-primary" type="submit">Save Settings</button>
+  </div>
+</form>
+{% endblock %}
+{% block scripts %}
+<script>
+async function testProvider(name) {
+  const el = document.getElementById(name + '-status');
+  el.textContent = 'Testing…';
+  const resp = await fetch(`/api/providers/${name}/test`, { method: 'POST' });
+  const d = await resp.json();
+  if (d.ok) {
+    el.textContent = 'Connected · ' + (d.model || '') + (d.supports_video !== undefined ? ` · video=${d.supports_video}` : '');
+    el.className = 'small status ok';
+  } else {
+    el.textContent = 'Failed: ' + (d.error || 'unknown');
+    el.className = 'small status warn';
+  }
+}
+
+async function submitSettings(e, form) {
+  e.preventDefault();
+  const fd = new FormData(form);
+  const resp = await fetch(form.action, { method: 'POST', body: fd });
+  if (resp.ok) { alert('Settings saved.'); window.location.reload(); }
+  else alert('Save failed.');
+  return false;
+}
+</script>
+{% endblock %}

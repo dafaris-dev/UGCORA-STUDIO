@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}{{ product.name }} — UGCORA Studio{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="/products" class="link">← Products</a>
+    <h1>{{ product.name }}</h1>
+    <p class="muted">{{ product.category or 'Uncategorized' }}</p>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-ghost" onclick="analyzeProduct({{ product.id }})" id="analyze-btn">Analyze with Gemini</button>
+    <button class="btn btn-danger" onclick="deleteProduct({{ product.id }})">Delete</button>
+  </div>
+</header>
+
+{% if product.image_path %}
+<img src="/{{ product.image_path }}" alt="" class="product-detail-img" />
+{% endif %}
+
+<form class="form card" id="product-form" onsubmit="return submitForm(event, this, '/products/' + {{ product.id }}, 'POST', true)" action="/api/products/{{ product.id }}" method="post">
+  <div class="grid grid-2">
+    <div>
+      <label>Product Name</label>
+      <input name="name" value="{{ product.name }}" required />
+      <label>Description</label>
+      <textarea name="description" rows="3">{{ product.description }}</textarea>
+      <label>Benefits</label>
+      <textarea name="benefits" rows="3">{{ product.benefits }}</textarea>
+      <label>Target Audience</label>
+      <input name="target_audience" value="{{ product.target_audience }}" />
+      <label>Website</label>
+      <input name="website" value="{{ product.website }}" />
+      <label>CTA</label>
+      <input name="cta" value="{{ product.cta }}" />
+    </div>
+    <div>
+      <h3>Gemini Analysis</h3>
+      <label>Category</label>
+      <input name="category" value="{{ product.category }}" />
+      <label>Analyzed Audience</label>
+      <textarea name="analyzed_audience" rows="3">{{ product.analyzed_audience }}</textarea>
+      <label>Customer Problem</label>
+      <textarea name="customer_problem" rows="3">{{ product.customer_problem }}</textarea>
+      <label>Main Benefits</label>
+      <textarea name="main_benefits" rows="3">{{ product.main_benefits }}</textarea>
+      <label>USP</label>
+      <input name="usp" value="{{ product.usp }}" />
+      <label>Marketing Angle</label>
+      <textarea name="marketing_angle" rows="2">{{ product.marketing_angle }}</textarea>
+      <label>UGC Hook</label>
+      <textarea name="ugc_hook" rows="2">{{ product.ugc_hook }}</textarea>
+      <label>Recommended CTA</label>
+      <input name="recommended_cta" value="{{ product.recommended_cta }}" />
+    </div>
+  </div>
+  <div class="actions">
+    <a href="/create?product_id={{ product.id }}" class="btn btn-ghost">Create Video →</a>
+    <button class="btn btn-primary" type="submit">Save Changes</button>
+  </div>
+</form>
+{% endblock %}
+{% block scripts %}
+<script>
+async function analyzeProduct(id) {
+  const btn = document.getElementById('analyze-btn');
+  btn.disabled = true;
+  btn.textContent = 'Analyzing...';
+  try {
+    const resp = await fetch(`/api/products/${id}/analyze`, { method: 'POST' });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ detail: 'Unknown error' }));
+      alert('Gemini request failed: ' + err.detail);
+      return;
+    }
+    const data = await resp.json();
+    for (const k of ['category','analyzed_audience','customer_problem','main_benefits','usp','marketing_angle','ugc_hook','recommended_cta']) {
+      const el = document.querySelector(`[name="${k}"]`);
+      if (el && data[k]) el.value = data[k];
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Analyze with Gemini';
+  }
+}
+async function deleteProduct(id) {
+  if (!confirm('Delete this product?')) return;
+  const resp = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+  if (resp.ok) window.location = '/products';
+}
+</script>
+{% endblock %}

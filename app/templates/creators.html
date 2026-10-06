@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Creators — UGCORA Studio{% endblock %}
+{% block content %}
+<header class="page-header">
+  <h1>Creator Library</h1>
+  <button class="btn btn-primary" onclick="document.getElementById('new-creator').showModal()">+ Add Creator</button>
+</header>
+
+<div class="chips">
+  <a href="/creators" class="chip {{ 'active' if not active_category else '' }}">All</a>
+  {% for c in categories %}
+    <a href="/creators?category={{ c }}" class="chip {{ 'active' if active_category == c else '' }}">{{ c }}</a>
+  {% endfor %}
+</div>
+
+<div class="grid grid-4">
+  {% for c in creators %}
+  <div class="card creator-card">
+    {% if c.image_path %}<img src="/{{ c.image_path }}" alt="" class="creator-img" />
+    {% else %}<div class="creator-img placeholder">{{ c.name[0] }}</div>{% endif %}
+    <h3>{{ c.name }}
+      <button class="favstar" onclick="toggleFav({{ c.id }}, this)">{{ '★' if c.favorite else '☆' }}</button>
+    </h3>
+    <p class="muted small">{{ c.category }} · {{ c.gender }}</p>
+    <p class="small">{{ c.personality }}</p>
+    <div class="actions">
+      <button class="btn btn-ghost" onclick="deleteCreator({{ c.id }})">Delete</button>
+    </div>
+  </div>
+  {% else %}
+  <div class="card empty">No creators in this category.</div>
+  {% endfor %}
+</div>
+
+<dialog id="new-creator" class="modal">
+  <form class="form" enctype="multipart/form-data" action="/api/creators" method="post" onsubmit="return submitForm(event, this, '/creators')">
+    <h2>Add Creator</h2>
+    <label>Name</label><input name="name" required />
+    <div class="grid grid-2">
+      <div>
+        <label>Category</label>
+        <select name="category">
+          {% for c in categories %}<option>{{ c }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label>Gender</label>
+        <select name="gender"><option>Female</option><option>Male</option></select>
+      </div>
+    </div>
+    <label>Style</label><input name="style" />
+    <label>Personality</label><input name="personality" />
+    <label>Age Appearance</label><input name="age_appearance" />
+    <label>Language</label><input name="language" value="English" />
+    <label>Default Voice</label><input name="default_voice" />
+    <label>Description</label><textarea name="description" rows="2"></textarea>
+    <label>Image</label><input name="image" type="file" accept="image/*" />
+    <div class="actions">
+      <button type="button" class="btn btn-ghost" onclick="this.closest('dialog').close()">Cancel</button>
+      <button class="btn btn-primary" type="submit">Save Creator</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}
+{% block scripts %}
+<script>
+async function toggleFav(id, el) {
+  const resp = await fetch(`/api/creators/${id}/favorite`, { method: 'POST' });
+  if (resp.ok) { const d = await resp.json(); el.textContent = d.favorite ? '★' : '☆'; }
+}
+async function deleteCreator(id) {
+  if (!confirm('Delete this creator?')) return;
+  const resp = await fetch(`/api/creators/${id}`, { method: 'DELETE' });
+  if (resp.ok) window.location.reload();
+}
+</script>
+{% endblock %}

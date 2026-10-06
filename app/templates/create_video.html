@@ -1,0 +1,375 @@
+{% extends "base.html" %}
+{% block title %}Create UGC Video — UGCORA{% endblock %}
+{% block content %}
+<header class="page-header">
+  <h1>Create UGC Video</h1>
+  <p class="muted">Product → Creator → Script → Style → Generate → Preview</p>
+</header>
+
+{% if not gemini_ready or not nvidia_ready %}
+<div class="alert">
+  {% if not gemini_ready %}Gemini is not configured. {% endif %}
+  {% if not nvidia_ready %}Video provider is not configured. {% endif %}
+  <a href="/settings" class="link">Open settings →</a>
+</div>
+{% endif %}
+
+<div class="wizard">
+  <div class="steps">
+    <div class="step active" data-step="1">1 · Product</div>
+    <div class="step" data-step="2">2 · Creator</div>
+    <div class="step" data-step="3">3 · Script</div>
+    <div class="step" data-step="4">4 · Style</div>
+    <div class="step" data-step="5">5 · Generate</div>
+    <div class="step" data-step="6">6 · Preview</div>
+  </div>
+
+  <!-- Step 1: Product -->
+  <section class="wizard-pane active" data-pane="1">
+    <h2>Pick a Product</h2>
+    <div class="grid grid-3">
+      {% for p in products %}
+      <div class="card hover selectable" data-select="product" data-id="{{ p.id }}" data-name="{{ p.name }}">
+        {% if p.image_path %}<img src="/{{ p.image_path }}" alt="" class="product-img" />{% endif %}
+        <h3>{{ p.name }}</h3>
+        <p class="muted small">{{ p.category or 'Uncategorized' }}</p>
+      </div>
+      {% else %}
+      <div class="card empty">No products. <a href="/products" class="link">Add one</a>.</div>
+      {% endfor %}
+    </div>
+    <div class="wizard-actions">
+      <div></div>
+      <button class="btn btn-primary" onclick="goStep(2)" id="next-1" disabled>Next →</button>
+    </div>
+  </section>
+
+  <!-- Step 2: Creator -->
+  <section class="wizard-pane" data-pane="2">
+    <h2>Pick a Creator</h2>
+    <div class="grid grid-4">
+      {% for c in creators %}
+      <div class="card hover selectable creator-card" data-select="creator" data-id="{{ c.id }}" data-name="{{ c.name }}" data-personality="{{ c.personality }}">
+        {% if c.image_path %}<img src="/{{ c.image_path }}" class="creator-img" alt="" />
+        {% else %}<div class="creator-img placeholder">{{ c.name[0] }}</div>{% endif %}
+        <h3>{{ c.name }}</h3>
+        <p class="muted small">{{ c.category }} · {{ c.gender }}</p>
+        <p class="small">{{ c.personality }}</p>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="wizard-actions">
+      <button class="btn btn-ghost" onclick="goStep(1)">← Back</button>
+      <button class="btn btn-primary" onclick="goStep(3)" id="next-2" disabled>Next →</button>
+    </div>
+  </section>
+
+  <!-- Step 3: Script -->
+  <section class="wizard-pane" data-pane="3">
+    <h2>Script</h2>
+    <div class="grid grid-2">
+      <div>
+        <label>Template</label>
+        <select id="tpl-template">
+          <option>Problem → Solution</option>
+          <option>Product Review</option>
+          <option>Unboxing</option>
+          <option>First Impression</option>
+          <option>3 Reasons Why</option>
+          <option>POV</option>
+          <option>Storytelling</option>
+          <option>Testimonial</option>
+          <option>Product Demonstration</option>
+          <option>Before & After</option>
+          <option>Product Recommendation</option>
+          <option>Limited Offer</option>
+        </select>
+        <label>Tone</label>
+        <select id="tpl-tone">
+          <option>Casual</option><option>Friendly</option><option>Energetic</option>
+          <option>Professional</option><option>Luxury</option><option>Funny</option>
+          <option>Persuasive</option><option>Authentic</option>
+        </select>
+        <label>Duration</label>
+        <select id="tpl-duration">
+          <option value="15">15s</option>
+          <option value="30" selected>30s</option>
+          <option value="45">45s</option>
+          <option value="60">60s</option>
+        </select>
+        <button class="btn btn-primary" onclick="generateScript()" id="gen-script">Generate UGC Script</button>
+      </div>
+      <div>
+        <label>Full Script (editable)</label>
+        <textarea id="script-text" rows="14" placeholder="Click 'Generate UGC Script' or write your own…"></textarea>
+        <div class="row">
+          <input type="text" id="rewrite-instr" placeholder="Rewrite instruction (e.g. 'make it shorter')" />
+          <button class="btn btn-ghost" onclick="rewriteScript()">Rewrite</button>
+        </div>
+      </div>
+    </div>
+    <div class="wizard-actions">
+      <button class="btn btn-ghost" onclick="goStep(2)">← Back</button>
+      <button class="btn btn-primary" onclick="goStep(4)" id="next-3">Next →</button>
+    </div>
+  </section>
+
+  <!-- Step 4: Style -->
+  <section class="wizard-pane" data-pane="4">
+    <h2>Style</h2>
+    <div class="grid grid-2">
+      <div>
+        <label>Location</label>
+        <select id="loc">{% for l in locations %}<option>{{ l }}</option>{% endfor %}</select>
+        <label>Camera</label>
+        <select id="cam">{% for c in cameras %}<option>{{ c }}</option>{% endfor %}</select>
+        <label>Lighting</label>
+        <select id="light">{% for l in lighting_options %}<option>{{ l }}</option>{% endfor %}</select>
+        <label>Clothing</label>
+        <input id="clothing" placeholder="e.g. soft cream sweater" />
+        <label>Action</label>
+        <input id="action" placeholder="e.g. holding product up to camera" />
+      </div>
+      <div>
+        <label>Aspect Ratio</label>
+        <select id="aspect">{% for a in aspect_ratios %}<option>{{ a }}</option>{% endfor %}</select>
+        <label>Resolution</label>
+        <select id="resolution">{% for r in resolutions %}<option {% if r == '1080p' %}selected{% endif %}>{{ r }}</option>{% endfor %}</select>
+        <label>Voice Name</label>
+        <input id="voice-name" placeholder="e.g. Female Casual Friendly" />
+        <label>Voice Style</label>
+        <input id="voice-style" placeholder="e.g. warm, upbeat" />
+      </div>
+    </div>
+    <div class="wizard-actions">
+      <button class="btn btn-ghost" onclick="goStep(3)">← Back</button>
+      <button class="btn btn-primary" onclick="buildPromptAndGo()" id="build-prompt">Build Prompt →</button>
+    </div>
+  </section>
+
+  <!-- Step 5: Generate -->
+  <section class="wizard-pane" data-pane="5">
+    <h2>Review & Generate</h2>
+    <div class="card summary" id="summary"></div>
+    <label>Generation Prompt (editable)</label>
+    <textarea id="prompt-text" rows="18"></textarea>
+    <label>Negative Instructions (optional)</label>
+    <textarea id="negative-text" rows="2" placeholder="Things to avoid in the video."></textarea>
+    <div class="wizard-actions">
+      <button class="btn btn-ghost" onclick="goStep(4)">← Back</button>
+      <button class="btn btn-primary btn-lg" onclick="generateVideo()" id="gen-video">Generate UGC Video</button>
+    </div>
+  </section>
+
+  <!-- Step 6: Preview -->
+  <section class="wizard-pane" data-pane="6">
+    <h2>Generating…</h2>
+    <div id="generation-status">
+      <div class="progress-row">
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+        <div class="progress-label" id="progress-label">0%</div>
+      </div>
+      <p class="status" id="status-text">Pending…</p>
+      <p id="error-text" class="status warn"></p>
+    </div>
+    <div id="player-wrap" style="display:none;">
+      <video id="player" controls style="width:100%;max-height:70vh;background:#000;"></video>
+      <div class="actions">
+        <button class="btn btn-primary" id="download-btn">Download</button>
+        <button class="btn btn-ghost" id="variation-btn">Create Variation</button>
+        <a href="/videos" class="btn btn-ghost">All Videos</a>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const state = {
+  productId: null, productName: null,
+  creatorId: null, creatorName: null, creatorPersonality: null,
+  scriptId: null,
+  prompt: '', videoId: null,
+};
+
+{% if request.query_params.get('product_id') %}
+  state.productId = {{ request.query_params.get('product_id') }};
+{% endif %}
+{% if request.query_params.get('project_id') %}
+  state.projectId = {{ request.query_params.get('project_id') }};
+{% endif %}
+
+document.querySelectorAll('[data-select]').forEach(el => {
+  el.addEventListener('click', () => {
+    const kind = el.dataset.select;
+    document.querySelectorAll(`[data-select="${kind}"]`).forEach(e => e.classList.remove('selected'));
+    el.classList.add('selected');
+    if (kind === 'product') {
+      state.productId = parseInt(el.dataset.id);
+      state.productName = el.dataset.name;
+      document.getElementById('next-1').disabled = false;
+    } else if (kind === 'creator') {
+      state.creatorId = parseInt(el.dataset.id);
+      state.creatorName = el.dataset.name;
+      state.creatorPersonality = el.dataset.personality;
+      document.getElementById('next-2').disabled = false;
+    }
+  });
+});
+
+// Preselect product if present in query
+if (state.productId) {
+  const el = document.querySelector(`[data-select="product"][data-id="${state.productId}"]`);
+  if (el) { el.classList.add('selected'); document.getElementById('next-1').disabled = false; }
+}
+
+function goStep(n) {
+  document.querySelectorAll('.step').forEach(s => s.classList.toggle('active', parseInt(s.dataset.step) <= n));
+  document.querySelectorAll('.wizard-pane').forEach(p => p.classList.toggle('active', parseInt(p.dataset.pane) === n));
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function generateScript() {
+  const btn = document.getElementById('gen-script');
+  btn.disabled = true; btn.textContent = 'Generating...';
+  try {
+    const body = {
+      product_id: state.productId,
+      creator_id: state.creatorId,
+      project_id: {{ request.query_params.get('project_id') or 'null' }},
+      template: document.getElementById('tpl-template').value,
+      duration_seconds: parseInt(document.getElementById('tpl-duration').value),
+      tone: document.getElementById('tpl-tone').value,
+    };
+    const resp = await fetch('/api/scripts/generate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!resp.ok) {
+      const err = await resp.json(); alert('Script failed: ' + err.detail); return;
+    }
+    const data = await resp.json();
+    state.scriptId = data.id;
+    document.getElementById('script-text').value = data.full_text;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Generate UGC Script';
+  }
+}
+
+async function rewriteScript() {
+  const instr = document.getElementById('rewrite-instr').value.trim();
+  const text = document.getElementById('script-text').value;
+  if (!instr || !text) return;
+  const resp = await fetch('/api/scripts/rewrite', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ script_id: state.scriptId, full_text: text, instruction: instr }),
+  });
+  if (!resp.ok) { const err = await resp.json(); alert('Rewrite failed: ' + err.detail); return; }
+  const data = await resp.json();
+  document.getElementById('script-text').value = data.full_text;
+}
+
+async function buildPromptAndGo() {
+  // Save script edits if we have a script id
+  if (state.scriptId) {
+    const fd = new FormData();
+    fd.append('full_text', document.getElementById('script-text').value);
+    fd.append('hook', ''); fd.append('body', ''); fd.append('cta', '');
+    await fetch(`/api/scripts/${state.scriptId}`, { method: 'POST', body: fd });
+  }
+  goStep(5);
+  const btn = document.getElementById('build-prompt');
+  btn.disabled = true;
+  const body = {
+    product_id: state.productId,
+    creator_id: state.creatorId,
+    script_id: state.scriptId,
+    location: document.getElementById('loc').value,
+    camera: document.getElementById('cam').value,
+    lighting: document.getElementById('light').value,
+    clothing: document.getElementById('clothing').value,
+    action: document.getElementById('action').value,
+    voice: document.getElementById('voice-name').value,
+    aspect_ratio: document.getElementById('aspect').value,
+    resolution: document.getElementById('resolution').value,
+    duration_seconds: parseInt(document.getElementById('tpl-duration').value || 30),
+    use_gemini: true,
+  };
+  try {
+    const resp = await fetch('/api/videos/prompt', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await resp.json();
+    document.getElementById('prompt-text').value = data.prompt || '';
+    document.getElementById('summary').innerHTML = `
+      <div><strong>Product:</strong> ${state.productName || '(none)'}</div>
+      <div><strong>Creator:</strong> ${state.creatorName || '(none)'}</div>
+      <div><strong>Format:</strong> ${body.aspect_ratio} · ${body.resolution} · ${body.duration_seconds}s</div>
+      <div><strong>Location:</strong> ${body.location} · <strong>Camera:</strong> ${body.camera}</div>
+    `;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function generateVideo() {
+  const btn = document.getElementById('gen-video');
+  btn.disabled = true;
+  const body = {
+    product_id: state.productId,
+    creator_id: state.creatorId,
+    script_id: state.scriptId,
+    project_id: {{ request.query_params.get('project_id') or 'null' }},
+    title: (state.productName || 'UGC') + ' · UGC Video',
+    prompt: document.getElementById('prompt-text').value,
+    negative_prompt: document.getElementById('negative-text').value,
+    aspect_ratio: document.getElementById('aspect').value,
+    resolution: document.getElementById('resolution').value,
+    duration_seconds: parseInt(document.getElementById('tpl-duration').value || 30),
+    location: document.getElementById('loc').value,
+    camera: document.getElementById('cam').value,
+    lighting: document.getElementById('light').value,
+    voice_name: document.getElementById('voice-name').value,
+    voice_style: document.getElementById('voice-style').value,
+  };
+  const resp = await fetch('/api/videos/generate', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok) {
+    const err = await resp.json(); alert('Video generation failed: ' + err.detail);
+    btn.disabled = false; return;
+  }
+  const data = await resp.json();
+  state.videoId = data.id;
+  goStep(6);
+  pollStatus();
+}
+
+async function pollStatus() {
+  if (!state.videoId) return;
+  const resp = await fetch(`/api/videos/${state.videoId}/status`);
+  if (!resp.ok) { setTimeout(pollStatus, 3000); return; }
+  const d = await resp.json();
+  document.getElementById('progress-fill').style.width = (d.progress || 0) + '%';
+  document.getElementById('progress-label').textContent = (d.progress || 0) + '%';
+  document.getElementById('status-text').textContent = d.status;
+  if (d.error_message) document.getElementById('error-text').textContent = d.error_message;
+  if (d.status === 'completed' && d.video_path) {
+    document.getElementById('player-wrap').style.display = 'block';
+    const url = d.video_path.startsWith('http') ? d.video_path : ('/' + d.video_path);
+    document.getElementById('player').src = url;
+    document.getElementById('download-btn').onclick = () => window.location = `/api/videos/${state.videoId}/download`;
+    document.getElementById('variation-btn').onclick = async () => {
+      const r = await fetch(`/api/videos/${state.videoId}/variation`, { method: 'POST' });
+      const dd = await r.json();
+      window.location = `/videos/${dd.id}`;
+    };
+    return;
+  }
+  if (d.status === 'failed') return;
+  setTimeout(pollStatus, 3000);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}UGCORA Studio{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body class="theme-dark">
+  {% if request.session.get('user') %}
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">U</div>
+      <div class="brand-text">
+        <div class="brand-name">UGCORA</div>
+        <div class="brand-sub">AI UGC Studio</div>
+      </div>
+    </div>
+    <nav class="nav">
+      <a href="/" class="nav-link">Dashboard</a>
+      <a href="/create" class="nav-link accent">+ Create Video</a>
+      <a href="/products" class="nav-link">Products</a>
+      <a href="/creators" class="nav-link">Creators</a>
+      <a href="/projects" class="nav-link">Projects</a>
+      <a href="/videos" class="nav-link">Videos</a>
+      <a href="/settings" class="nav-link">Settings</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user">{{ request.session.get('user') }}</div>
+      <a href="/logout" class="logout">Log out</a>
+    </div>
+  </aside>
+  <main class="main">
+    {% block content %}{% endblock %}
+  </main>
+  {% else %}
+    {% block auth_content %}{% endblock %}
+  {% endif %}
+
+  <script src="/static/js/app.js"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

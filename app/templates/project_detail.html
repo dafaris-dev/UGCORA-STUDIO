@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — UGCORA{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="/projects" class="link">← Projects</a>
+    <h1>{{ project.name }}</h1>
+    <p class="muted">{{ project.description }}</p>
+  </div>
+  <div class="header-actions">
+    <a href="/create?project_id={{ project.id }}" class="btn btn-primary">+ Create Video in Project</a>
+  </div>
+</header>
+
+{% if product %}
+<div class="card">
+  <h3>Linked Product: {{ product.name }}</h3>
+  <p class="muted small">{{ product.description[:160] }}</p>
+</div>
+{% endif %}
+
+<section class="section">
+  <h2>Videos</h2>
+  <div class="grid grid-3">
+    {% for v in videos %}
+    <a href="/videos/{{ v.id }}" class="card hover">
+      <h3>{{ v.title }}</h3>
+      <p class="muted small">{{ v.provider }} · {{ v.aspect_ratio }}</p>
+      <p class="status {{ 'ok' if v.status == 'completed' else ('warn' if v.status == 'failed' else '') }}">{{ v.status }}</p>
+    </a>
+    {% else %}
+    <div class="card empty">No videos in this project yet.</div>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

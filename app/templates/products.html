@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Products — UGCORA Studio{% endblock %}
+{% block content %}
+<header class="page-header">
+  <h1>Products</h1>
+  <button class="btn btn-primary" onclick="document.getElementById('new-product').showModal()">+ Add Product</button>
+</header>
+
+<div class="grid grid-3">
+  {% for p in products %}
+  <a href="/products/{{ p.id }}" class="card hover product-card">
+    {% if p.image_path %}<img src="/{{ p.image_path }}" alt="" class="product-img" />{% endif %}
+    <h3>{{ p.name }}</h3>
+    <p class="muted small">{{ p.category or 'Uncategorized' }}</p>
+    <p class="small">{{ p.description[:140] }}</p>
+  </a>
+  {% else %}
+  <div class="card empty">No products yet. Click "+ Add Product".</div>
+  {% endfor %}
+</div>
+
+<dialog id="new-product" class="modal">
+  <form method="post" action="/api/products" enctype="multipart/form-data" class="form" onsubmit="return submitForm(event, this, '/products')">
+    <h2>Add Product</h2>
+    <label>Product Name</label>
+    <input name="name" required />
+    <label>Description</label>
+    <textarea name="description" rows="3"></textarea>
+    <label>Benefits</label>
+    <textarea name="benefits" rows="3"></textarea>
+    <label>Target Audience</label>
+    <input name="target_audience" />
+    <label>Website</label>
+    <input name="website" />
+    <label>Call To Action</label>
+    <input name="cta" />
+    <label>Product Image</label>
+    <input name="image" type="file" accept="image/*" />
+    <label>Product Video (optional)</label>
+    <input name="video" type="file" accept="video/*" />
+    <label>Logo (optional)</label>
+    <input name="logo" type="file" accept="image/*" />
+    <div class="actions">
+      <button type="button" class="btn btn-ghost" onclick="this.closest('dialog').close()">Cancel</button>
+      <button class="btn btn-primary" type="submit">Save Product</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}

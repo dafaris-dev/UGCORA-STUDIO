@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}{{ video.title }} — UGCORA{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="/videos" class="link">← Videos</a>
+    <h1>{{ video.title }}</h1>
+    <p class="muted">{{ video.provider }} · {{ video.model or 'model n/a' }} · {{ video.aspect_ratio }} · {{ video.resolution }}</p>
+  </div>
+  <div class="header-actions">
+    <a href="/create" class="btn btn-ghost">+ New</a>
+    <button class="btn btn-danger" onclick="deleteVideo({{ video.id }})">Delete</button>
+  </div>
+</header>
+
+<div class="card">
+  <p class="status {{ 'ok' if video.status == 'completed' else ('warn' if video.status == 'failed' else '') }}" id="status-text">{{ video.status }}</p>
+  <div class="progress-row">
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width: {{ video.progress }}%;"></div></div>
+    <div class="progress-label" id="progress-label">{{ video.progress }}%</div>
+  </div>
+  {% if video.error_message %}<p class="status warn">{{ video.error_message }}</p>{% endif %}
+
+  {% if video.video_path %}
+  <video controls style="width:100%;max-height:70vh;background:#000;" id="player"
+         src="{{ video.video_path if video.video_path.startswith('http') else ('/' + video.video_path) }}"></video>
+  <div class="actions">
+    <a href="/api/videos/{{ video.id }}/download" class="btn btn-primary">Download</a>
+    <button class="btn btn-ghost" onclick="createVariation({{ video.id }})">Create Variation</button>
+    <a href="/create" class="btn btn-ghost">New Video</a>
+  </div>
+  {% endif %}
+</div>
+
+<div class="grid grid-2">
+  <div class="card">
+    <h3>Prompt</h3>
+    <pre class="prompt">{{ video.prompt }}</pre>
+  </div>
+  <div class="card">
+    <h3>Details</h3>
+    <ul class="plain">
+      <li>Location: {{ video.location or '-' }}</li>
+      <li>Camera: {{ video.camera or '-' }}</li>
+      <li>Lighting: {{ video.lighting or '-' }}</li>
+      <li>Voice: {{ video.voice_name or '-' }} ({{ video.voice_style or '-' }})</li>
+      <li>Duration: {{ video.duration_seconds }}s</li>
+      <li>Created: {{ video.created_at.strftime('%Y-%m-%d %H:%M') }}</li>
+      {% if video.completed_at %}<li>Completed: {{ video.completed_at.strftime('%Y-%m-%d %H:%M') }}</li>{% endif %}
+      <li>Generation ID: {{ video.generation_id or '-' }}</li>
+    </ul>
+    {% if script %}<p><a href="/products/{{ product.id }}" class="link">Edit product</a></p>{% endif %}
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function deleteVideo(id) {
+  if (!confirm('Delete this video?')) return;
+  const resp = await fetch(`/api/videos/${id}`, { method: 'DELETE' });
+  if (resp.ok) window.location = '/videos';
+}
+async function createVariation(id) {
+  const r = await fetch(`/api/videos/${id}/variation`, { method: 'POST' });
+  const d = await r.json();
+  window.location = `/videos/${d.id}`;
+}
+
+{% if video.status in ['pending', 'preparing', 'submitting', 'generating', 'rendering'] %}
+async function poll() {
+  const resp = await fetch(`/api/videos/{{ video.id }}/status`);
+  if (!resp.ok) return setTimeout(poll, 3000);
+  const d = await resp.json();
+  document.getElementById('status-text').textContent = d.status;
+  document.getElementById('progress-fill').style.width = (d.progress || 0) + '%';
+  document.getElementById('progress-label').textContent = (d.progress || 0) + '%';
+  if (d.status === 'completed' || d.status === 'failed') { window.location.reload(); return; }
+  setTimeout(poll, 3000);
+}
+poll();
+{% endif %}
+</script>
+{% endblock %}
