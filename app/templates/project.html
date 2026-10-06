@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Project — UGCORA Studio{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <div class="eyebrow">PROJECT</div>
+    <h1>Semua Hasil Generate</h1>
+    <p class="muted">Setiap avatar / video yang kamu generate muncul di sini.</p>
+  </div>
+  <a href="/create" class="btn btn-primary">+ Create Baru</a>
+</header>
+
+<div class="grid grid-3">
+  {% for g in gens %}
+  <a href="/project/{{ g.id }}" class="card hover">
+    <h3>{{ g.title }}</h3>
+    <p class="muted small">{{ g.video_provider or 'provider tidak diset' }} · {{ g.video_model or '-' }}</p>
+    <p class="muted small">{{ g.aspect_ratio }} · {{ g.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+    <p class="status {% if g.status == 'completed' %}ok{% elif g.status == 'failed' %}warn{% endif %}">{{ g.status }}</p>
+    <p class="small">{{ "{:,}".format(g.total_tokens or 0) }} tokens prompt</p>
+  </a>
+  {% else %}
+  <div class="card empty">
+    Belum ada project.
+    <br><br>
+    <a href="/create" class="btn btn-primary">+ Create pertama kamu</a>
+  </div>
+  {% endfor %}
+</div>
+
+<style>
+.eyebrow { display: inline-block; font-size: 11px; letter-spacing: 2px; color: var(--accent); text-transform: uppercase; font-weight: 600; margin-bottom: 4px; }
+.status { font-weight: 600; font-size: 12px; text-transform: capitalize; margin: 4px 0; }
+.status.ok { color: var(--ok); }
+.status.warn { color: var(--warn); }
+</style>
+{% endblock %}

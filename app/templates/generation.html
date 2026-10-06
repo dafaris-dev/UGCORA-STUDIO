@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}{{ gen.title }} — UGCORA{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a href="/project" class="link small">← Project</a>
+    <h1>{{ gen.title }}</h1>
+    <p class="muted small">{{ gen.video_provider or '—' }} · {{ gen.video_model or '—' }} · {{ gen.aspect_ratio }} · {{ gen.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+  </div>
+  <div class="header-actions">
+    {% if gen.video_path %}<a href="/api/generations/{{ gen.id }}/download" class="btn btn-primary">Download</a>{% endif %}
+    <button class="btn btn-danger" onclick="deleteGen({{ gen.id }})">Delete</button>
+  </div>
+</header>
+
+<div class="card">
+  <p class="status {% if gen.status == 'completed' %}ok{% elif gen.status == 'failed' %}warn{% endif %}" id="status-text">{{ gen.status }}</p>
+  <div class="progress-row">
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width: {{ gen.progress }}%;"></div></div>
+    <div id="progress-label" class="progress-label">{{ gen.progress }}%</div>
+  </div>
+  {% if gen.error_message %}<p class="status warn" style="margin-top:10px">⚠ {{ gen.error_message }}</p>{% endif %}
+
+  {% if gen.video_path %}
+  <video controls style="width:100%;max-height:70vh;background:#000;margin-top:16px"
+         src="{{ gen.video_path if gen.video_path.startswith('http') else ('/' + gen.video_path) }}"></video>
+  {% elif gen.image_path %}
+  <img style="width:100%;max-height:70vh;object-fit:contain;background:#000;margin-top:16px"
+       src="{{ '/' + gen.image_path }}">
+  {% endif %}
+</div>
+
+<div class="grid grid-2 section">
+  <div class="card">
+    <h3>Avatar Spec</h3>
+    <ul class="plain">
+      <li><strong>Subject:</strong> {{ gen.gender }} · {{ gen.age_range }} · {{ gen.ethnicity }} · {{ gen.skin_tone }}</li>
+      <li><strong>Face:</strong> {{ gen.hijab or gen.hair_style }} / {{ gen.hair_color }} · {{ gen.grooming }} · {{ gen.expression }}{% if gen.glasses %} · {{ gen.glasses }}{% endif %}</li>
+      <li><strong>Pose:</strong> {{ gen.body_pose }} · {{ gen.framing }} · {{ gen.hand_gesture }}</li>
+      <li><strong>Outfit:</strong> {{ gen.outfit_color }} {{ gen.outfit }}</li>
+      <li><strong>Setting:</strong> {{ gen.setting }} · {{ gen.lighting }} · {{ gen.style }}</li>
+      {% if gen.extras %}<li><strong>Extras:</strong> {{ gen.extras }}</li>{% endif %}
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Tokens</h3>
+    <ul class="plain">
+      <li>Prompt tokens: {{ "{:,}".format(gen.prompt_tokens or 0) }}</li>
+      <li>Output tokens: {{ "{:,}".format(gen.output_tokens or 0) }}</li>
+      <li><strong>Total: {{ "{:,}".format(gen.total_tokens or 0) }}</strong></li>
+    </ul>
+    {% if product %}<p class="small" style="margin-top:10px"><strong>Produk:</strong> {{ product.name }}</p>{% endif %}
+    {% if gen.generation_id %}<p class="small" style="margin-top:4px"><strong>Provider gen id:</strong> <span class="mono">{{ gen.generation_id }}</span></p>{% endif %}
+  </div>
+</div>
+
+<div class="card section">
+  <h3>Prompt</h3>
+  <pre class="prompt" style="white-space:pre-wrap;font-family:ui-monospace,Menlo,monospace;font-size:12px;background:var(--bg);padding:14px;border-radius:6px;max-height:400px;overflow:auto">{{ gen.prompt }}</pre>
+  <div class="actions"><button class="btn" onclick="copyPrompt()">📋 Copy Prompt</button></div>
+</div>
+
+<style>
+.progress-row { display:flex; align-items:center; gap:12px; margin: 8px 0; }
+.progress-bar { flex:1; height: 6px; background: var(--bg); border-radius: 999px; overflow: hidden; border: 1px solid var(--border); }
+.progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-strong)); width: 0%; transition: width .3s ease; }
+.progress-label { font-size: 12px; color: var(--muted); min-width: 40px; text-align: right; }
+.plain { list-style: none; padding: 0; margin: 0; }
+.plain li { padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.plain li:last-child { border-bottom: 0; }
+.status { font-weight: 600; font-size: 12px; text-transform: capitalize; }
+.status.ok { color: var(--ok); } .status.warn { color: var(--warn); }
+.mono { font-family: ui-monospace, Menlo, monospace; font-size: 11px; }
+.eyebrow { display: inline-block; font-size: 11px; letter-spacing: 2px; color: var(--accent); text-transform: uppercase; font-weight: 600; margin-bottom: 4px; }
+</style>
+{% endblock %}
+{% block scripts %}
+<script>
+async function deleteGen(id) {
+  if (!confirm('Hapus generation ini?')) return;
+  const r = await fetch(`/api/generations/${id}`, { method: 'DELETE' });
+  if (r.ok) window.location = '/project';
+}
+async function copyPrompt() {
+  const txt = document.querySelector('pre.prompt').textContent;
+  try { await navigator.clipboard.writeText(txt); alert('Prompt disalin.'); }
+  catch(_) { alert('Copy manual: pilih teks dan Ctrl/Cmd+C'); }
+}
+
+{% if gen.status in ['queued','preparing','submitting','generating','rendering'] %}
+async function poll() {
+  const r = await fetch(`/api/generations/{{ gen.id }}/status`);
+  if (!r.ok) return setTimeout(poll, 3000);
+  const d = await r.json();
+  document.getElementById('status-text').textContent = d.status;
+  document.getElementById('progress-fill').style.width = (d.progress || 0) + '%';
+  document.getElementById('progress-label').textContent = (d.progress || 0) + '%';
+  if (d.status === 'completed' || d.status === 'failed') { window.location.reload(); return; }
+  setTimeout(poll, 3000);
+}
+poll();
+{% endif %}
+</script>
+{% endblock %}

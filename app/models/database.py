@@ -23,5 +23,5 @@ def get_db():
 
 
 def init_db():
-    from app.models import product, project, creator, script, video, user, setting  # noqa: F401
+    from app.models import product, video, user, setting, token_usage  # noqa: F401
     Base.metadata.create_all(bind=engine)

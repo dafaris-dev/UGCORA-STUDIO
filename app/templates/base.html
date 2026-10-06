@@ -1,12 +1,11 @@
 <!doctype html>
-<html lang="en">
+<html lang="id">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{% block title %}UGCORA Studio{% endblock %}</title>
   <link rel="stylesheet" href="/static/css/style.css" />
   <script>
-    // Apply saved theme before paint to avoid flash
     try {
       var t = localStorage.getItem('ugcora_theme');
       if (t === 'light') document.documentElement.setAttribute('data-theme', 'light');
@@ -24,13 +23,11 @@
       </div>
     </div>
     <nav class="nav">
-      <a href="/" class="nav-link">Dashboard</a>
+      <a href="/" class="nav-link{% if request.url.path == '/' %} active{% endif %}">Dashboard</a>
       <a href="/create" class="nav-link accent">+ Create Video</a>
-      <a href="/products" class="nav-link">Products</a>
-      <a href="/creators" class="nav-link">Creators</a>
-      <a href="/projects" class="nav-link">Projects</a>
-      <a href="/videos" class="nav-link">Videos</a>
-      <a href="/settings" class="nav-link">Settings</a>
+      <a href="/project" class="nav-link{% if request.url.path.startswith('/project') %} active{% endif %}">Project</a>
+      <a href="/biaya" class="nav-link{% if request.url.path == '/biaya' %} active{% endif %}">Biaya</a>
+      <a href="/settings" class="nav-link{% if request.url.path == '/settings' %} active{% endif %}">Settings</a>
     </nav>
     <div class="sidebar-footer">
       <div class="user">{{ request.session.get('user') }}</div>

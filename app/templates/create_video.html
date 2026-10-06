@@ -1,375 +1,329 @@
 {% extends "base.html" %}
-{% block title %}Create UGC Video — UGCORA{% endblock %}
+{% block title %}Create Avatar UGC — UGCORA{% endblock %}
 {% block content %}
-<header class="page-header">
-  <h1>Create UGC Video</h1>
-  <p class="muted">Product → Creator → Script → Style → Generate → Preview</p>
-</header>
+<section class="hero">
+  <div>
+    <div class="eyebrow">AVATAR STUDIO</div>
+    <h1>Create Avatar UGC</h1>
+    <p class="muted">Pilih spesifikasi avatar + upload produk. AI akan merakit prompt dan generate video UGC-nya.</p>
+  </div>
+</section>
 
-{% if not gemini_ready or not nvidia_ready %}
-<div class="alert">
-  {% if not gemini_ready %}Gemini is not configured. {% endif %}
-  {% if not nvidia_ready %}Video provider is not configured. {% endif %}
-  <a href="/settings" class="link">Open settings →</a>
+{% if not any_llm_ready and not video_ready %}
+<div class="banner-warn">
+  ⚠ <strong>Gemini / Groq belum diisi</strong> — tombol <em>Create Prompt (AI)</em> akan pakai local prompt saja.
+  Isi di <a href="/settings" class="link">Settings → LLM Providers</a> (keduanya GRATIS tanpa kartu kredit), atau klik Copy Prompt → tempel di Google Flow.
+</div>
+{% elif not video_ready %}
+<div class="banner-warn">
+  ⚠ Video provider belum diset — tombol <em>Generate Video</em> akan gagal. Isi di <a href="/settings" class="link">Settings → Video Generation</a>, atau Copy prompt dan jalankan di tool pihak ketiga.
 </div>
 {% endif %}
 
-<div class="wizard">
-  <div class="steps">
-    <div class="step active" data-step="1">1 · Product</div>
-    <div class="step" data-step="2">2 · Creator</div>
-    <div class="step" data-step="3">3 · Script</div>
-    <div class="step" data-step="4">4 · Style</div>
-    <div class="step" data-step="5">5 · Generate</div>
-    <div class="step" data-step="6">6 · Preview</div>
-  </div>
+<div class="create-grid">
+  <!-- LEFT: form -->
+  <div>
+    <!-- Produk -->
+    <div class="card section-block">
+      <h2>📦 Produk</h2>
+      <p class="small">Upload produk kamu — gambar + nama. AI akan masukin produk ke dalam prompt.</p>
 
-  <!-- Step 1: Product -->
-  <section class="wizard-pane active" data-pane="1">
-    <h2>Pick a Product</h2>
-    <div class="grid grid-3">
-      {% for p in products %}
-      <div class="card hover selectable" data-select="product" data-id="{{ p.id }}" data-name="{{ p.name }}">
-        {% if p.image_path %}<img src="/{{ p.image_path }}" alt="" class="product-img" />{% endif %}
-        <h3>{{ p.name }}</h3>
-        <p class="muted small">{{ p.category or 'Uncategorized' }}</p>
+      <div id="product-picker">
+        <label class="field">Pilih produk yang sudah ada</label>
+        <select id="product-select">
+          <option value="">— pilih atau upload baru di bawah —</option>
+          {% for p in products %}
+          <option value="{{ p.id }}" {% if selected_product and selected_product.id == p.id %}selected{% endif %}>{{ p.name }}</option>
+          {% endfor %}
+        </select>
       </div>
-      {% else %}
-      <div class="card empty">No products. <a href="/products" class="link">Add one</a>.</div>
-      {% endfor %}
-    </div>
-    <div class="wizard-actions">
-      <div></div>
-      <button class="btn btn-primary" onclick="goStep(2)" id="next-1" disabled>Next →</button>
-    </div>
-  </section>
 
-  <!-- Step 2: Creator -->
-  <section class="wizard-pane" data-pane="2">
-    <h2>Pick a Creator</h2>
-    <div class="grid grid-4">
-      {% for c in creators %}
-      <div class="card hover selectable creator-card" data-select="creator" data-id="{{ c.id }}" data-name="{{ c.name }}" data-personality="{{ c.personality }}">
-        {% if c.image_path %}<img src="/{{ c.image_path }}" class="creator-img" alt="" />
-        {% else %}<div class="creator-img placeholder">{{ c.name[0] }}</div>{% endif %}
-        <h3>{{ c.name }}</h3>
-        <p class="muted small">{{ c.category }} · {{ c.gender }}</p>
-        <p class="small">{{ c.personality }}</p>
-      </div>
-      {% endfor %}
+      <details class="upload-fold" {% if not products %}open{% endif %}>
+        <summary>+ Upload produk baru</summary>
+        <form id="product-form" enctype="multipart/form-data" onsubmit="return uploadProduct(event)">
+          <label class="field">Nama produk</label>
+          <input name="name" required placeholder="Contoh: Hydro Smart Bottle">
+          <label class="field">Deskripsi singkat</label>
+          <textarea name="description" rows="2" placeholder="Satu-dua kalimat yang jelasin produk"></textarea>
+          <label class="field">Gambar produk</label>
+          <input type="file" name="image" accept="image/*">
+          <div class="actions"><button class="btn btn-primary" type="submit">Save & Pilih</button></div>
+        </form>
+      </details>
     </div>
-    <div class="wizard-actions">
-      <button class="btn btn-ghost" onclick="goStep(1)">← Back</button>
-      <button class="btn btn-primary" onclick="goStep(3)" id="next-2" disabled>Next →</button>
-    </div>
-  </section>
 
-  <!-- Step 3: Script -->
-  <section class="wizard-pane" data-pane="3">
-    <h2>Script</h2>
-    <div class="grid grid-2">
-      <div>
-        <label>Template</label>
-        <select id="tpl-template">
-          <option>Problem → Solution</option>
-          <option>Product Review</option>
-          <option>Unboxing</option>
-          <option>First Impression</option>
-          <option>3 Reasons Why</option>
-          <option>POV</option>
-          <option>Storytelling</option>
-          <option>Testimonial</option>
-          <option>Product Demonstration</option>
-          <option>Before & After</option>
-          <option>Product Recommendation</option>
-          <option>Limited Offer</option>
-        </select>
-        <label>Tone</label>
-        <select id="tpl-tone">
-          <option>Casual</option><option>Friendly</option><option>Energetic</option>
-          <option>Professional</option><option>Luxury</option><option>Funny</option>
-          <option>Persuasive</option><option>Authentic</option>
-        </select>
-        <label>Duration</label>
-        <select id="tpl-duration">
-          <option value="15">15s</option>
-          <option value="30" selected>30s</option>
-          <option value="45">45s</option>
-          <option value="60">60s</option>
-        </select>
-        <button class="btn btn-primary" onclick="generateScript()" id="gen-script">Generate UGC Script</button>
-      </div>
-      <div>
-        <label>Full Script (editable)</label>
-        <textarea id="script-text" rows="14" placeholder="Click 'Generate UGC Script' or write your own…"></textarea>
-        <div class="row">
-          <input type="text" id="rewrite-instr" placeholder="Rewrite instruction (e.g. 'make it shorter')" />
-          <button class="btn btn-ghost" onclick="rewriteScript()">Rewrite</button>
+    <!-- 1 Subject -->
+    <div class="card section-block">
+      <h2>1 · Subjek</h2>
+      <div class="grid grid-2">
+        <div>
+          <label class="field">Gender</label>
+          <select data-k="gender">{% for v in options.gender %}<option>{{ v }}</option>{% endfor %}</select>
+          <label class="field">Etnis / wajah</label>
+          <select data-k="ethnicity">{% for v in options.ethnicity %}<option>{{ v }}</option>{% endfor %}</select>
+        </div>
+        <div>
+          <label class="field">Umur</label>
+          <select data-k="age_range">{% for v in options.age_range %}<option {% if v == '25-30' %}selected{% endif %}>{{ v }}</option>{% endfor %}</select>
+          <label class="field">Warna kulit</label>
+          <select data-k="skin_tone">{% for v in options.skin_tone %}<option>{{ v }}</option>{% endfor %}</select>
         </div>
       </div>
     </div>
-    <div class="wizard-actions">
-      <button class="btn btn-ghost" onclick="goStep(2)">← Back</button>
-      <button class="btn btn-primary" onclick="goStep(4)" id="next-3">Next →</button>
-    </div>
-  </section>
 
-  <!-- Step 4: Style -->
-  <section class="wizard-pane" data-pane="4">
-    <h2>Style</h2>
-    <div class="grid grid-2">
-      <div>
-        <label>Location</label>
-        <select id="loc">{% for l in locations %}<option>{{ l }}</option>{% endfor %}</select>
-        <label>Camera</label>
-        <select id="cam">{% for c in cameras %}<option>{{ c }}</option>{% endfor %}</select>
-        <label>Lighting</label>
-        <select id="light">{% for l in lighting_options %}<option>{{ l }}</option>{% endfor %}</select>
-        <label>Clothing</label>
-        <input id="clothing" placeholder="e.g. soft cream sweater" />
-        <label>Action</label>
-        <input id="action" placeholder="e.g. holding product up to camera" />
-      </div>
-      <div>
-        <label>Aspect Ratio</label>
-        <select id="aspect">{% for a in aspect_ratios %}<option>{{ a }}</option>{% endfor %}</select>
-        <label>Resolution</label>
-        <select id="resolution">{% for r in resolutions %}<option {% if r == '1080p' %}selected{% endif %}>{{ r }}</option>{% endfor %}</select>
-        <label>Voice Name</label>
-        <input id="voice-name" placeholder="e.g. Female Casual Friendly" />
-        <label>Voice Style</label>
-        <input id="voice-style" placeholder="e.g. warm, upbeat" />
+    <!-- 2 Hair & Face -->
+    <div class="card section-block">
+      <h2>2 · Rambut & Wajah</h2>
+      <div class="grid grid-2">
+        <div>
+          <label class="field">Hijab / kerudung</label>
+          <select data-k="hijab">{% for v in options.hijab %}<option>{{ v }}</option>{% endfor %}</select>
+          <label class="field">Warna rambut</label>
+          <select data-k="hair_color">{% for v in options.hair_color %}<option>{{ v }}</option>{% endfor %}</select>
+          <label class="field">Ekspresi</label>
+          <select data-k="expression">{% for v in options.expression %}<option>{{ v }}</option>{% endfor %}</select>
+        </div>
+        <div>
+          <label class="field">Gaya rambut (kalau tanpa hijab)</label>
+          <select data-k="hair_style">{% for v in options.hair_style %}<option>{{ v }}</option>{% endfor %}</select>
+          <label class="field">Riasan / grooming</label>
+          <select data-k="grooming">{% for v in options.grooming %}<option>{{ v }}</option>{% endfor %}</select>
+          <label class="field">Kacamata</label>
+          <select data-k="glasses">{% for v in options.glasses %}<option>{{ v }}</option>{% endfor %}</select>
+        </div>
       </div>
     </div>
-    <div class="wizard-actions">
-      <button class="btn btn-ghost" onclick="goStep(3)">← Back</button>
-      <button class="btn btn-primary" onclick="buildPromptAndGo()" id="build-prompt">Build Prompt →</button>
-    </div>
-  </section>
 
-  <!-- Step 5: Generate -->
-  <section class="wizard-pane" data-pane="5">
-    <h2>Review & Generate</h2>
-    <div class="card summary" id="summary"></div>
-    <label>Generation Prompt (editable)</label>
-    <textarea id="prompt-text" rows="18"></textarea>
-    <label>Negative Instructions (optional)</label>
-    <textarea id="negative-text" rows="2" placeholder="Things to avoid in the video."></textarea>
-    <div class="wizard-actions">
-      <button class="btn btn-ghost" onclick="goStep(4)">← Back</button>
-      <button class="btn btn-primary btn-lg" onclick="generateVideo()" id="gen-video">Generate UGC Video</button>
+    <!-- 3 Pose -->
+    <div class="card section-block">
+      <h2>3 · Pose & Framing</h2>
+      <div class="grid grid-3">
+        <div>
+          <label class="field">Posisi badan</label>
+          <select data-k="body_pose">{% for v in options.body_pose %}<option>{{ v }}</option>{% endfor %}</select>
+        </div>
+        <div>
+          <label class="field">Framing</label>
+          <select data-k="framing">{% for v in options.framing %}<option>{{ v }}</option>{% endfor %}</select>
+        </div>
+        <div>
+          <label class="field">Gestur tangan</label>
+          <select data-k="hand_gesture">{% for v in options.hand_gesture %}<option>{{ v }}</option>{% endfor %}</select>
+        </div>
+      </div>
     </div>
-  </section>
 
-  <!-- Step 6: Preview -->
-  <section class="wizard-pane" data-pane="6">
-    <h2>Generating…</h2>
-    <div id="generation-status">
-      <div class="progress-row">
-        <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
-        <div class="progress-label" id="progress-label">0%</div>
-      </div>
-      <p class="status" id="status-text">Pending…</p>
-      <p id="error-text" class="status warn"></p>
-    </div>
-    <div id="player-wrap" style="display:none;">
-      <video id="player" controls style="width:100%;max-height:70vh;background:#000;"></video>
-      <div class="actions">
-        <button class="btn btn-primary" id="download-btn">Download</button>
-        <button class="btn btn-ghost" id="variation-btn">Create Variation</button>
-        <a href="/videos" class="btn btn-ghost">All Videos</a>
+    <!-- 4 Outfit -->
+    <div class="card section-block">
+      <h2>4 · Outfit</h2>
+      <div class="grid grid-2">
+        <div>
+          <label class="field">Baju</label>
+          <select data-k="outfit">{% for v in options.outfit %}<option>{{ v }}</option>{% endfor %}</select>
+        </div>
+        <div>
+          <label class="field">Warna baju</label>
+          <select data-k="outfit_color">{% for v in options.outfit_color %}<option>{{ v }}</option>{% endfor %}</select>
+        </div>
       </div>
     </div>
-  </section>
+
+    <!-- 5 Setting -->
+    <div class="card section-block">
+      <h2>5 · Setting & Kamera</h2>
+      <div class="grid grid-2">
+        <div>
+          <label class="field">Setting / background</label>
+          <select data-k="setting">{% for v in options.setting %}<option>{{ v }}</option>{% endfor %}</select>
+          <label class="field">Style foto</label>
+          <select data-k="style">{% for v in options.style %}<option>{{ v }}</option>{% endfor %}</select>
+        </div>
+        <div>
+          <label class="field">Pencahayaan</label>
+          <select data-k="lighting">{% for v in options.lighting %}<option>{{ v }}</option>{% endfor %}</select>
+          <label class="field">Aspect ratio</label>
+          <select data-k="aspect_ratio">{% for v in options.aspect_ratio %}<option>{{ v }}</option>{% endfor %}</select>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6 Extras -->
+    <div class="card section-block">
+      <h2>6 · Tambahan bebas <span class="small">(opsional)</span></h2>
+      <p class="small">Detail apa pun sesukamu — aksesoris, ciri khas, warna spesifik, mood, etc.</p>
+      <textarea data-k="extras" rows="3" placeholder="mis: pakai kalung emas tipis, tahi lalat di pipi, background ada tanaman monstera, senyum tipis natural..."></textarea>
+    </div>
+  </div>
+
+  <!-- RIGHT: prompt panel -->
+  <aside class="prompt-panel">
+    <div class="card panel-sticky">
+      <h3>✨ Prompt</h3>
+      <button id="btn-build" class="btn btn-prompt" onclick="buildPrompt()">
+        ✨ Create Prompt (AI) — rakit + translate
+      </button>
+
+      <textarea id="prompt-text" rows="14" placeholder="Klik 'Create Prompt (AI)' untuk auto-rakit — atau tulis sendiri di sini."></textarea>
+
+      <div class="actions-row">
+        <button class="btn" onclick="copyPrompt()" id="btn-copy">📋 Copy</button>
+        <button class="btn btn-primary" onclick="generateVideo()" id="btn-generate">⚡ Generate</button>
+      </div>
+
+      <div class="helper small">
+        <div>✓ <strong>Create Prompt</strong> — AI rakit + translate (Indo → English), pakai Gemini/Groq (gratis).</div>
+        <div>✓ <strong>Copy</strong> — jalur gratis: tempel di Google Flow / tool lain.</div>
+        <div>✓ <strong>Generate</strong> — pakai video provider yang diset di Settings.</div>
+      </div>
+
+      <div id="status-area" class="status-area" hidden></div>
+    </div>
+  </aside>
 </div>
+
+<style>
+.hero { padding: 24px 28px; border-radius: 14px;
+  background: radial-gradient(ellipse at top right, rgba(228,176,98,0.12), transparent 55%),
+              linear-gradient(180deg, var(--bg-elev), var(--bg-elev-2));
+  border: 1px solid var(--border); margin-bottom: 20px;
+  display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap;
+}
+.hero h1 { font-size: 26px; margin: 6px 0 4px; }
+.eyebrow { font-size: 11px; letter-spacing: 2px; color: var(--accent); text-transform: uppercase; font-weight: 600; }
+
+.banner-warn {
+  padding: 10px 14px; border-radius: 8px; margin-bottom: 16px;
+  background: rgba(224,163,95,0.08); border: 1px solid rgba(224,163,95,0.35);
+  color: var(--muted); font-size: 13px;
+}
+
+.create-grid { display: grid; grid-template-columns: 1fr 380px; gap: 20px; }
+@media (max-width: 1100px) { .create-grid { grid-template-columns: 1fr; } }
+
+.section-block { padding: 20px 22px; margin-bottom: 16px; }
+.section-block h2 { font-size: 15px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+
+.upload-fold { margin-top: 12px; }
+.upload-fold summary { cursor: pointer; color: var(--muted); font-size: 13px; padding: 8px 0; }
+.upload-fold summary:hover { color: var(--text); }
+
+.prompt-panel { min-width: 0; }
+.panel-sticky { position: sticky; top: 20px; padding: 20px; }
+.panel-sticky h3 { font-size: 14px; margin-bottom: 12px; }
+.btn-prompt {
+  width: 100%; background: linear-gradient(135deg, #9b6cf0, #c084fc); color: #fff; border: 0; font-weight: 600;
+  padding: 11px; margin-bottom: 12px;
+}
+.btn-prompt:hover { opacity: 0.9; }
+#prompt-text { font-size: 12.5px; font-family: ui-monospace, "SF Mono", Menlo, monospace; min-height: 240px; background: var(--bg); }
+.actions-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0 12px; }
+.actions-row .btn { padding: 10px; }
+.helper { color: var(--muted); line-height: 1.7; font-size: 11.5px; padding: 10px; background: var(--bg); border-radius: 6px; margin-top: 10px; }
+.helper div + div { margin-top: 2px; }
+.status-area { margin-top: 12px; padding: 10px; border-radius: 6px; background: var(--bg); font-size: 12px; }
+.status-area.ok { background: rgba(88,193,122,0.1); color: var(--ok); }
+.status-area.warn { background: rgba(224,95,95,0.1); color: var(--danger); }
+
+.stat { padding: 14px 16px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 10px; display: flex; justify-content: space-between; align-items: baseline; }
+.stat .label { font-size: 11px; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; }
+.stat .value { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+</style>
 {% endblock %}
+
 {% block scripts %}
 <script>
-const state = {
-  productId: null, productName: null,
-  creatorId: null, creatorName: null, creatorPersonality: null,
-  scriptId: null,
-  prompt: '', videoId: null,
-};
+const SELECTED_PRODUCT_ID = {{ selected_product.id if selected_product else 'null' }};
+let currentProductId = SELECTED_PRODUCT_ID;
 
-{% if request.query_params.get('product_id') %}
-  state.productId = {{ request.query_params.get('product_id') }};
-{% endif %}
-{% if request.query_params.get('project_id') %}
-  state.projectId = {{ request.query_params.get('project_id') }};
-{% endif %}
+function readSpec() {
+  const spec = {};
+  document.querySelectorAll('[data-k]').forEach(el => { spec[el.dataset.k] = el.value; });
+  return spec;
+}
 
-document.querySelectorAll('[data-select]').forEach(el => {
-  el.addEventListener('click', () => {
-    const kind = el.dataset.select;
-    document.querySelectorAll(`[data-select="${kind}"]`).forEach(e => e.classList.remove('selected'));
-    el.classList.add('selected');
-    if (kind === 'product') {
-      state.productId = parseInt(el.dataset.id);
-      state.productName = el.dataset.name;
-      document.getElementById('next-1').disabled = false;
-    } else if (kind === 'creator') {
-      state.creatorId = parseInt(el.dataset.id);
-      state.creatorName = el.dataset.name;
-      state.creatorPersonality = el.dataset.personality;
-      document.getElementById('next-2').disabled = false;
-    }
-  });
+document.getElementById('product-select').addEventListener('change', e => {
+  currentProductId = e.target.value ? parseInt(e.target.value) : null;
 });
 
-// Preselect product if present in query
-if (state.productId) {
-  const el = document.querySelector(`[data-select="product"][data-id="${state.productId}"]`);
-  if (el) { el.classList.add('selected'); document.getElementById('next-1').disabled = false; }
+async function uploadProduct(e) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const resp = await fetch('/api/products', { method: 'POST', body: fd });
+  if (!resp.ok) { alert('Upload gagal.'); return false; }
+  const data = await resp.json();
+  const sel = document.getElementById('product-select');
+  const opt = document.createElement('option');
+  opt.value = data.id; opt.textContent = data.name; opt.selected = true;
+  sel.appendChild(opt);
+  currentProductId = data.id;
+  e.target.reset();
+  showStatus('✓ Produk tersimpan: ' + data.name, 'ok');
+  return false;
 }
 
-function goStep(n) {
-  document.querySelectorAll('.step').forEach(s => s.classList.toggle('active', parseInt(s.dataset.step) <= n));
-  document.querySelectorAll('.wizard-pane').forEach(p => p.classList.toggle('active', parseInt(p.dataset.pane) === n));
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-async function generateScript() {
-  const btn = document.getElementById('gen-script');
-  btn.disabled = true; btn.textContent = 'Generating...';
+async function buildPrompt() {
+  const btn = document.getElementById('btn-build');
+  btn.disabled = true; const original = btn.textContent;
+  btn.textContent = '⏳ Merakit prompt...';
   try {
-    const body = {
-      product_id: state.productId,
-      creator_id: state.creatorId,
-      project_id: {{ request.query_params.get('project_id') or 'null' }},
-      template: document.getElementById('tpl-template').value,
-      duration_seconds: parseInt(document.getElementById('tpl-duration').value),
-      tone: document.getElementById('tpl-tone').value,
-    };
-    const resp = await fetch('/api/scripts/generate', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+    const resp = await fetch('/api/prompt/build', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ product_id: currentProductId, spec: readSpec(), use_ai: true }),
     });
     if (!resp.ok) {
-      const err = await resp.json(); alert('Script failed: ' + err.detail); return;
+      const err = await resp.json(); showStatus('Gagal: ' + err.detail, 'warn'); return;
     }
     const data = await resp.json();
-    state.scriptId = data.id;
-    document.getElementById('script-text').value = data.full_text;
+    document.getElementById('prompt-text').value = data.prompt;
+    let msg = `✓ Prompt dirakit via ${data.source}`;
+    if (data.tokens && data.tokens.total_tokens) msg += ` · ${data.tokens.total_tokens} tokens (FREE)`;
+    if (data.warning) msg += ` — ${data.warning}`;
+    showStatus(msg, data.warning ? 'warn' : 'ok');
   } finally {
-    btn.disabled = false; btn.textContent = 'Generate UGC Script';
+    btn.disabled = false; btn.textContent = original;
   }
 }
 
-async function rewriteScript() {
-  const instr = document.getElementById('rewrite-instr').value.trim();
-  const text = document.getElementById('script-text').value;
-  if (!instr || !text) return;
-  const resp = await fetch('/api/scripts/rewrite', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ script_id: state.scriptId, full_text: text, instruction: instr }),
-  });
-  if (!resp.ok) { const err = await resp.json(); alert('Rewrite failed: ' + err.detail); return; }
-  const data = await resp.json();
-  document.getElementById('script-text').value = data.full_text;
-}
-
-async function buildPromptAndGo() {
-  // Save script edits if we have a script id
-  if (state.scriptId) {
-    const fd = new FormData();
-    fd.append('full_text', document.getElementById('script-text').value);
-    fd.append('hook', ''); fd.append('body', ''); fd.append('cta', '');
-    await fetch(`/api/scripts/${state.scriptId}`, { method: 'POST', body: fd });
-  }
-  goStep(5);
-  const btn = document.getElementById('build-prompt');
-  btn.disabled = true;
-  const body = {
-    product_id: state.productId,
-    creator_id: state.creatorId,
-    script_id: state.scriptId,
-    location: document.getElementById('loc').value,
-    camera: document.getElementById('cam').value,
-    lighting: document.getElementById('light').value,
-    clothing: document.getElementById('clothing').value,
-    action: document.getElementById('action').value,
-    voice: document.getElementById('voice-name').value,
-    aspect_ratio: document.getElementById('aspect').value,
-    resolution: document.getElementById('resolution').value,
-    duration_seconds: parseInt(document.getElementById('tpl-duration').value || 30),
-    use_gemini: true,
-  };
+async function copyPrompt() {
+  const text = document.getElementById('prompt-text').value;
+  if (!text) { showStatus('Prompt masih kosong — klik Create Prompt dulu.', 'warn'); return; }
   try {
-    const resp = await fetch('/api/videos/prompt', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+    await navigator.clipboard.writeText(text);
+    showStatus('✓ Prompt disalin ke clipboard. Tempel di Google Flow / tool pilihan kamu.', 'ok');
+  } catch(_) {
+    document.getElementById('prompt-text').select();
+    showStatus('Prompt dipilih — tekan Cmd/Ctrl+C untuk copy.', 'ok');
+  }
+}
+
+async function generateVideo() {
+  const prompt = document.getElementById('prompt-text').value.trim();
+  if (!prompt) { showStatus('Prompt masih kosong.', 'warn'); return; }
+  const btn = document.getElementById('btn-generate');
+  btn.disabled = true;
+  try {
+    const resp = await fetch('/api/generations', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        product_id: currentProductId, spec: readSpec(),
+        prompt, negative_prompt: '',
+      }),
     });
+    if (!resp.ok) {
+      const err = await resp.json(); showStatus('Gagal: ' + err.detail, 'warn'); return;
+    }
     const data = await resp.json();
-    document.getElementById('prompt-text').value = data.prompt || '';
-    document.getElementById('summary').innerHTML = `
-      <div><strong>Product:</strong> ${state.productName || '(none)'}</div>
-      <div><strong>Creator:</strong> ${state.creatorName || '(none)'}</div>
-      <div><strong>Format:</strong> ${body.aspect_ratio} · ${body.resolution} · ${body.duration_seconds}s</div>
-      <div><strong>Location:</strong> ${body.location} · <strong>Camera:</strong> ${body.camera}</div>
-    `;
+    showStatus(`✓ Generation #${data.id} queued — buka halaman detailnya...`, 'ok');
+    setTimeout(() => { window.location = `/project/${data.id}`; }, 600);
   } finally {
     btn.disabled = false;
   }
 }
 
-async function generateVideo() {
-  const btn = document.getElementById('gen-video');
-  btn.disabled = true;
-  const body = {
-    product_id: state.productId,
-    creator_id: state.creatorId,
-    script_id: state.scriptId,
-    project_id: {{ request.query_params.get('project_id') or 'null' }},
-    title: (state.productName || 'UGC') + ' · UGC Video',
-    prompt: document.getElementById('prompt-text').value,
-    negative_prompt: document.getElementById('negative-text').value,
-    aspect_ratio: document.getElementById('aspect').value,
-    resolution: document.getElementById('resolution').value,
-    duration_seconds: parseInt(document.getElementById('tpl-duration').value || 30),
-    location: document.getElementById('loc').value,
-    camera: document.getElementById('cam').value,
-    lighting: document.getElementById('light').value,
-    voice_name: document.getElementById('voice-name').value,
-    voice_style: document.getElementById('voice-style').value,
-  };
-  const resp = await fetch('/api/videos/generate', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!resp.ok) {
-    const err = await resp.json(); alert('Video generation failed: ' + err.detail);
-    btn.disabled = false; return;
-  }
-  const data = await resp.json();
-  state.videoId = data.id;
-  goStep(6);
-  pollStatus();
-}
-
-async function pollStatus() {
-  if (!state.videoId) return;
-  const resp = await fetch(`/api/videos/${state.videoId}/status`);
-  if (!resp.ok) { setTimeout(pollStatus, 3000); return; }
-  const d = await resp.json();
-  document.getElementById('progress-fill').style.width = (d.progress || 0) + '%';
-  document.getElementById('progress-label').textContent = (d.progress || 0) + '%';
-  document.getElementById('status-text').textContent = d.status;
-  if (d.error_message) document.getElementById('error-text').textContent = d.error_message;
-  if (d.status === 'completed' && d.video_path) {
-    document.getElementById('player-wrap').style.display = 'block';
-    const url = d.video_path.startsWith('http') ? d.video_path : ('/' + d.video_path);
-    document.getElementById('player').src = url;
-    document.getElementById('download-btn').onclick = () => window.location = `/api/videos/${state.videoId}/download`;
-    document.getElementById('variation-btn').onclick = async () => {
-      const r = await fetch(`/api/videos/${state.videoId}/variation`, { method: 'POST' });
-      const dd = await r.json();
-      window.location = `/videos/${dd.id}`;
-    };
-    return;
-  }
-  if (d.status === 'failed') return;
-  setTimeout(pollStatus, 3000);
+function showStatus(msg, kind) {
+  const el = document.getElementById('status-area');
+  el.textContent = msg; el.className = 'status-area ' + (kind || '');
+  el.hidden = false;
 }
 </script>
 {% endblock %}

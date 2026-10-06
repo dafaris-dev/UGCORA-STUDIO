@@ -1,70 +1,61 @@
 {% extends "base.html" %}
 {% block title %}Dashboard — UGCORA Studio{% endblock %}
 {% block content %}
-<header class="page-header">
+<section class="hero">
   <div>
-    <h1>Welcome to UGCORA Studio</h1>
-    <p class="muted">Product → Creator → Video.</p>
+    <div class="eyebrow">WELCOME BACK</div>
+    <h1>Studio</h1>
+    <p class="muted">Upload produk, bikin avatar UGC, dan generate video — semua di satu tempat.</p>
   </div>
   <a href="/create" class="btn btn-primary btn-lg">+ Create UGC Video</a>
-</header>
+</section>
 
-<section class="grid grid-3">
-  <div class="card status-card">
-    <h3>Gemini</h3>
-    <p class="status {{ 'ok' if gemini_ready else 'warn' }}">
-      {{ 'Connected' if gemini_ready else 'Not configured' }}
-    </p>
-    <a href="/settings" class="link">Configure →</a>
-  </div>
-  <div class="card status-card">
-    <h3>Video Provider</h3>
-    <p class="muted">{{ video_provider | capitalize }}</p>
-    <p class="status {{ 'ok' if nvidia_ready else 'warn' }}">
-      {{ 'Ready' if nvidia_ready else 'Not configured' }}
-    </p>
-  </div>
-  <div class="card status-card">
-    <h3>Library</h3>
-    <p class="muted">{{ product_count }} products · {{ creator_count }} creators</p>
-    <a href="/products" class="link">Open products →</a>
+<section class="grid grid-4">
+  <div class="stat"><span class="label">Products</span><span class="value">{{ product_count }}</span></div>
+  <div class="stat"><span class="label">Generations</span><span class="value">{{ gen_count }}</span></div>
+  <div class="stat"><span class="label">Token / 30h</span><span class="value">{{ "{:,}".format(tokens_30d) }}</span></div>
+  <div class="stat"><span class="label">Run / 30h</span><span class="value">{{ runs_30d }}</span></div>
+</section>
+
+<section class="section">
+  <h2>Provider status</h2>
+  <div class="grid grid-3">
+    <div class="card">
+      <h3>LLM (Prompt builder)</h3>
+      {% if gemini_ready %}<span class="pill ok dot">Gemini aktif · FREE</span>
+      {% elif groq_ready %}<span class="pill ok dot">Groq aktif · FREE</span>
+      {% else %}<span class="pill warn dot">Belum ada LLM gratis diset</span>{% endif %}
+      <p class="small" style="margin-top:8px"><a href="/settings" class="link">Konfigurasi di Settings →</a></p>
+    </div>
+    <div class="card">
+      <h3>Video generator</h3>
+      {% if video_ready %}<span class="pill ok dot">{{ video_provider | upper }} ready</span>
+      {% else %}<span class="pill warn dot">Belum terkonfigurasi</span>{% endif %}
+      <p class="small" style="margin-top:8px">Pilih default di Settings → Video Generation.</p>
+    </div>
+    <div class="card">
+      <h3>Token</h3>
+      <p class="muted small">Pantau lengkap di <a href="/biaya" class="link">Biaya →</a></p>
+      <p class="small" style="margin-top:4px">Engine FREE (Gemini / Groq) tidak dihitung biaya.</p>
+    </div>
   </div>
 </section>
 
 <section class="section">
   <div class="section-header">
-    <h2>Recent Projects</h2>
-    <a href="/projects" class="link">View all →</a>
+    <h2>Hasil generate terbaru</h2>
+    <a href="/project" class="link">Lihat semua →</a>
   </div>
   <div class="grid grid-3">
-    {% for p in projects %}
-    <a href="/projects/{{ p.id }}" class="card hover">
-      <h3>{{ p.name }}</h3>
-      <p class="muted small">{{ p.description[:120] }}</p>
-      <p class="small">Updated {{ p.updated_at.strftime('%Y-%m-%d') }}</p>
+    {% for g in gens %}
+    <a href="/project/{{ g.id }}" class="card hover">
+      <h3>{{ g.title }}</h3>
+      <p class="muted small">{{ g.video_provider or 'tidak diset' }} · {{ g.aspect_ratio }}</p>
+      <p class="status {% if g.status == 'completed' %}ok{% elif g.status == 'failed' %}warn{% endif %}">{{ g.status }}</p>
+      <p class="small">{{ g.total_tokens or 0 }} tokens</p>
     </a>
     {% else %}
-    <div class="card empty">No projects yet. <a href="/projects" class="link">Create one</a>.</div>
-    {% endfor %}
-  </div>
-</section>
-
-<section class="section">
-  <div class="section-header">
-    <h2>Recent Videos</h2>
-    <a href="/videos" class="link">View all →</a>
-  </div>
-  <div class="grid grid-3">
-    {% for v in videos %}
-    <a href="/videos/{{ v.id }}" class="card hover">
-      <h3>{{ v.title }}</h3>
-      <p class="muted small">{{ v.provider }} · {{ v.aspect_ratio }} · {{ v.resolution }}</p>
-      <p class="status {{ 'ok' if v.status == 'completed' else ('warn' if v.status == 'failed' else '') }}">
-        {{ v.status }}
-      </p>
-    </a>
-    {% else %}
-    <div class="card empty">No videos yet. <a href="/create" class="link">Create one</a>.</div>
+    <div class="card empty">Belum ada generation. <a href="/create" class="link">Create satu →</a></div>
     {% endfor %}
   </div>
 </section>

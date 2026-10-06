@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Biaya — UGCORA Studio{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <div class="eyebrow">TOKEN TRACKER</div>
+    <h1>Pemakaian Token</h1>
+    <p class="muted">Mantau berapa token kepake per agent, per provider, per produk.</p>
+    <p class="small">Engine FREE (Gemini / Groq) tetap dicatat jumlahnya — tapi kolom "biaya" nggak ada karena nol.</p>
+  </div>
+  <form method="get" style="display:flex;gap:8px;align-items:center">
+    <select name="days" onchange="this.form.submit()">
+      <option value="7"  {% if days == 7  %}selected{% endif %}>7 hari terakhir</option>
+      <option value="30" {% if days == 30 %}selected{% endif %}>30 hari terakhir</option>
+      <option value="90" {% if days == 90 %}selected{% endif %}>90 hari terakhir</option>
+      <option value="365"{% if days == 365%}selected{% endif %}>1 tahun</option>
+    </select>
+    <a href="/api/biaya/export?days={{ days }}" class="btn">⬇ Export CSV</a>
+  </form>
+</section>
+
+<div class="grid grid-2" style="margin-bottom:16px">
+  <div class="card total-card">
+    <div class="label">TOTAL TOKEN KEPAKE ({{ days }}H)</div>
+    <div class="big">{{ "{:,}".format(s.total_tokens).replace(",", ".") }}</div>
+    <div class="small">token (input + output, estimasi ~4 char/token)</div>
+    <div class="small">{{ s.runs }} run</div>
+  </div>
+  <div class="card note">
+    <h3>💡 Catatan</h3>
+    <p class="small">Pakai engine <strong>Gemini / Groq (FREE)</strong> → token tidak dihitung biaya. Angka di sini cuma buat mantau pemakaian, biar tau seberapa berat tiap agent.</p>
+  </div>
+</div>
+
+<div class="grid grid-3" style="margin-bottom:16px">
+  <div class="card">
+    <h3>👥 By Agent</h3>
+    <ul class="rankings">
+      {% for name, tokens in s.by_agent[:5] %}
+      <li><span>{{ name }}</span><span class="val">{{ "{:,}".format(tokens).replace(",", ".") }} <span class="unit">tok</span></span></li>
+      {% else %}<li class="empty">belum ada data</li>{% endfor %}
+    </ul>
+  </div>
+  <div class="card">
+    <h3>🔌 By Provider</h3>
+    <ul class="rankings">
+      {% for name, tokens in s.by_provider[:5] %}
+      <li><span>{{ name }}</span><span class="val">{{ "{:,}".format(tokens).replace(",", ".") }} <span class="unit">tok</span></span></li>
+      {% else %}<li class="empty">belum ada data</li>{% endfor %}
+    </ul>
+  </div>
+  <div class="card">
+    <h3>📦 By Product</h3>
+    <ul class="rankings">
+      {% for name, tokens in s.by_product[:5] %}
+      <li><span>{{ name }}</span><span class="val">{{ "{:,}".format(tokens).replace(",", ".") }} <span class="unit">tok</span></span></li>
+      {% else %}<li class="empty">belum ada data</li>{% endfor %}
+    </ul>
+  </div>
+</div>
+
+<div class="card">
+  <h3>📋 Run terbaru ({{ s.recent|length }} dari {{ s.runs }})</h3>
+  <div class="table-wrap">
+    <table class="runs">
+      <thead>
+        <tr><th>WAKTU</th><th>AGENT</th><th>PRODUK</th><th>PROVIDER</th><th>MODEL</th><th class="num">TOKEN</th></tr>
+      </thead>
+      <tbody>
+        {% for r in s.recent %}
+        <tr>
+          <td class="muted">{{ r.when }}</td>
+          <td>{{ r.agent }}</td>
+          <td>{{ r.product or '—' }}</td>
+          <td>{{ r.provider }}{% if r.free %} <span class="free-tag">FREE</span>{% endif %}</td>
+          <td class="muted small">{{ r.model }}</td>
+          <td class="num">{{ "{:,}".format(r.total).replace(",", ".") }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="muted" style="text-align:center;padding:20px">Belum ada run — bikin satu di <a href="/create" class="link">Create Video</a>.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<style>
+.hero { padding: 24px 28px; border-radius: 14px;
+  background: radial-gradient(ellipse at top right, rgba(228,176,98,0.12), transparent 55%),
+              linear-gradient(180deg, var(--bg-elev), var(--bg-elev-2));
+  border: 1px solid var(--border); margin-bottom: 20px;
+  display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;
+}
+.hero h1 { font-size: 26px; margin: 6px 0 4px; }
+.eyebrow { font-size: 11px; letter-spacing: 2px; color: var(--accent); text-transform: uppercase; font-weight: 600; }
+
+.total-card .label { font-size: 11px; letter-spacing: 1px; color: var(--muted); text-transform: uppercase; margin-bottom: 10px; }
+.total-card .big { font-size: 42px; font-weight: 800; letter-spacing: -1px; font-variant-numeric: tabular-nums; }
+.note h3 { margin-bottom: 6px; }
+
+.rankings { list-style: none; padding: 0; margin: 10px 0 0; }
+.rankings li { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.rankings li:last-child { border-bottom: 0; }
+.rankings .val { font-variant-numeric: tabular-nums; font-weight: 600; }
+.rankings .unit { color: var(--muted); font-size: 11px; margin-left: 2px; font-weight: 400; }
+.rankings .empty { color: var(--muted); font-size: 12px; justify-content: center; }
+
+.table-wrap { overflow-x: auto; margin-top: 10px; }
+table.runs { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.runs th { text-align: left; font-size: 10.5px; letter-spacing: 1px; color: var(--muted); text-transform: uppercase; font-weight: 600; border-bottom: 1px solid var(--border); padding: 10px 8px; }
+table.runs td { padding: 10px 8px; border-bottom: 1px solid var(--border); }
+table.runs tr:last-child td { border-bottom: 0; }
+table.runs .num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.free-tag { background: rgba(88,193,122,0.15); color: var(--ok); font-size: 10px; padding: 1px 6px; border-radius: 3px; font-weight: 700; letter-spacing: 0.5px; margin-left: 4px; }
+</style>
+{% endblock %}

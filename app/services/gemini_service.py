@@ -37,8 +37,9 @@ def _build_parts(prompt: str, image_path: Optional[str] = None) -> List[Dict[str
     return parts
 
 
-def _call(api_key: str, model: str, prompt: str, image_path: Optional[str] = None,
-          json_mode: bool = False, temperature: float = 0.7) -> str:
+def _call_raw(api_key: str, model: str, prompt: str, image_path: Optional[str] = None,
+              json_mode: bool = False, temperature: float = 0.7) -> Dict[str, Any]:
+    """Call Gemini and return {text, input_tokens, output_tokens, total_tokens}."""
     if not api_key:
         raise GeminiError("Gemini API key is not configured.")
     if not model:
@@ -78,11 +79,23 @@ def _call(api_key: str, model: str, prompt: str, image_path: Optional[str] = Non
         content = candidates[0].get("content", {})
         parts = content.get("parts", [])
         text_out = "".join(p.get("text", "") for p in parts)
-        return text_out.strip()
+        usage = data.get("usageMetadata", {})
+        return {
+            "text": text_out.strip(),
+            "input_tokens": usage.get("promptTokenCount", 0),
+            "output_tokens": usage.get("candidatesTokenCount", 0),
+            "total_tokens": usage.get("totalTokenCount", 0),
+        }
     except GeminiError:
         raise
     except Exception as exc:
         raise GeminiError(f"Unexpected Gemini response: {exc}") from exc
+
+
+def _call(api_key: str, model: str, prompt: str, image_path: Optional[str] = None,
+          json_mode: bool = False, temperature: float = 0.7) -> str:
+    """Backward-compat helper that returns only the text."""
+    return _call_raw(api_key, model, prompt, image_path, json_mode, temperature)["text"]
 
 
 def _safe_json(text: str) -> Dict[str, Any]:
