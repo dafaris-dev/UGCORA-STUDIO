@@ -2,126 +2,151 @@
 
 **Product → Creator → Video.**
 
-UGCORA Studio is a **private**, single-owner AI creative studio for generating
+UGCORA Studio is a **private, single-owner** AI creative studio for generating
 UGC-style marketing videos. It is **not** a SaaS: there is no billing, no
-subscriptions, no public registration — just you, your products, and your AI providers.
+subscriptions, no public registration — just you, your products, and your AI
+providers.
 
-The ideal workflow:
+Workflow:
 
 ```
 Upload Product → Analyze (Gemini) → Choose Creator → Generate Script →
 Edit Script → Choose Style → Generate Video → Preview → Download
 ```
 
-## Requirements
+---
 
-- Python 3.11+
-- A Google Gemini API key (for product analysis & script generation)
-- An NVIDIA API key with a model that supports video generation
-  (any video-capable NVIDIA model; set the exact model id in Settings)
+## 🚀 Quickstart (menjalankan di komputer kamu)
 
-## Installation
+### Prasyarat
+- **Python 3.11+** — [download di python.org](https://www.python.org/downloads/)
+  (Windows: saat install, centang **"Add Python to PATH"**)
+- Terminal / Command Prompt
 
+### 1. Download project
 ```bash
-# 1. Clone / enter project
-cd ugcora
-
-# 2. Create virtual environment
-python -m venv venv
-
-# Windows
-venv\Scripts\activate
-
-# macOS / Linux
-source venv/bin/activate
-
-# 3. Install dependencies
-pip install -r requirements.txt
-
-# 4. Copy environment file
-cp .env.example .env   # (or 'copy' on Windows)
+git clone https://github.com/dafaris-dev/UGCORA-STUDIO.git
+cd UGCORA-STUDIO
 ```
 
-Edit `.env` with your credentials:
+### 2. Jalankan sekali untuk setup
 
+**macOS / Linux:**
+```bash
+./start.sh
 ```
-ADMIN_USERNAME=you
-ADMIN_PASSWORD=choose-a-strong-password
-SESSION_SECRET=some-long-random-string
 
-GEMINI_API_KEY=your-gemini-key
+**Windows:**
+```bat
+start.bat
+```
+
+Script ini akan otomatis:
+1. Membuat virtual environment (`venv/`)
+2. Install semua dependency
+3. Membuat file `.env` dari template
+4. Berhenti dan minta kamu isi `.env`
+
+### 3. Edit `.env`
+Buka file `.env` (text editor apa saja) dan isi:
+```ini
+ADMIN_USERNAME=namamu
+ADMIN_PASSWORD=password-rahasia
+
+GEMINI_API_KEY=xxx     # dari https://aistudio.google.com/apikey
 GEMINI_MODEL=gemini-2.0-flash
 
-NVIDIA_API_KEY=your-nvidia-key
-NVIDIA_MODEL=
-NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1
+NVIDIA_API_KEY=xxx     # dari https://build.nvidia.com/
+NVIDIA_MODEL=           # id model video (lihat katalog NVIDIA NIM)
+NVIDIA_BASE_URL=https:/integrate.api.nvidia.com/v1
 ```
 
-## Running
-
+### 4. Jalankan lagi
 ```bash
-python run.py
+./start.sh          # macOS/Linux
+start.bat           # Windows
 ```
 
-Then open:
-
+### 5. Buka di browser
 ```
 http://127.0.0.1:8000
 ```
+Login pakai `ADMIN_USERNAME` + `ADMIN_PASSWORD` dari `.env`.
 
-Log in with the admin credentials from your `.env`. The SQLite database and
-local data directories are created automatically on first run.
+---
 
-## Where things live
+## Cara akses dari HP / device lain di jaringan WiFi yang sama
 
-- `app/main.py` — FastAPI app factory, mounts routers and middleware.
-- `app/routes/` — all HTTP routes (pages and API endpoints).
-- `app/services/` — service layer: Gemini, NVIDIA, prompt engine, voice,
-  file handling, auth, config, video orchestration.
-- `app/models/` — SQLAlchemy models and database bootstrap.
-- `app/templates/` — Jinja2 HTML.
-- `app/static/` — CSS, JS, images.
-- `data/` — all local file storage (SQLite DB, uploaded images, generated video files).
+Edit `.env`:
+```ini
+APP_HOST=0.0.0.0
+APP_PORT=8000
+```
+Lalu jalankan ulang. Dari HP buka `http://IP-LAPTOPMU:8000` (cek IP laptop
+dengan `ipconfig` di Windows atau `ifconfig` / `ip a` di mac/linux).
 
-## Providers
+---
 
-### Gemini
+## Setup manual (tanpa script)
 
-Used for:
+Kalau mau manual:
+```bash
+python -m venv venv
 
-- Product image analysis
-- UGC hook, CTA, and script generation
-- Prompt engineering before the video call
+# Activate
+source venv/bin/activate       # macOS/Linux
+venv\Scripts\activate          # Windows
 
-The model is configurable at runtime in **Settings**.
+pip install -r requirements.txt
+cp .env.example .env           # (Windows: copy .env.example .env)
+# edit .env
+python run.py
+```
 
-### NVIDIA
+---
 
-Used for video generation. The service inspects the configured model and
-clearly reports if the chosen model does not support video generation
-rather than silently faking a result.
+## Struktur project
+```
+app/
+├── main.py              FastAPI app factory
+├── routes/              HTTP routes (pages + /api/*)
+├── services/            Gemini, NVIDIA, prompt engine, video orchestration, auth
+├── models/              SQLAlchemy models + DB bootstrap
+├── templates/           Jinja2 HTML
+└── static/              CSS, JS
 
-A `VideoProvider` abstraction (`app/services/video_service.py`) exists so
-additional providers can be added without touching the UI.
+data/                    Local storage (SQLite db, uploads, generated videos)
+```
+
+## Fitur utama
+
+- **Products** — Upload gambar, Gemini analyze: kategori, audience, problem,
+  USP, marketing angle, hook, CTA.
+- **Creator Library** — 8 fictional creator pre-seeded, bisa tambah custom.
+- **Scripts** — 12 template × 8 tone × 4 durasi. Gemini generate + rewrite.
+- **Prompt Engine** — 13-section structured prompt (SUBJECT, ENVIRONMENT, …).
+- **Video Provider Abstraction** — `NvidiaVideoProvider` sudah terpasang.
+  Jika model yang dikonfigurasi tidak mendukung video, aplikasi **jujur
+  menolak** — tidak pernah fake output.
+- **Projects** — Mengelompokkan campaign (product + creators + videos + variations).
+- **Settings** — Masked API keys, test connection untuk setiap provider.
+
+## Keamanan
+- API keys hanya di `.env` atau DB override — tidak pernah tampil ke
+  frontend plain (UI menampilkan `••••••••••1234`).
+- Password admin di-hash dengan bcrypt.
+- `.env` sudah di `.gitignore`.
+- Session cookie di-sign dengan `SESSION_SECRET`.
 
 ## Troubleshooting
 
-- **"Gemini API key is not configured"** → add it on the Settings page or in `.env`.
-- **"This configured NVIDIA model does not support video generation"** →
-  the NVIDIA model id you selected is image/text-only. Switch to a
-  video-capable model in Settings.
-- **"Not authenticated"** → session expired. Log in again.
-- **Database errors** → delete `data/ugcora.db` and restart; it will be recreated.
-- **File upload issues** → check `data/` is writable.
-
-## Security
-
-- API keys live in environment variables or an encrypted DB override (never
-  returned to the browser in plain text — the UI shows `••••••••••1234`).
-- Passwords are hashed with bcrypt.
-- `.env` is in `.gitignore`.
-- Sessions use signed cookies with `SESSION_SECRET`.
+| Masalah | Solusi |
+|---|---|
+| `Gemini API key is not configured` | Isi `GEMINI_API_KEY` di `.env` atau Settings page |
+| `This configured provider/model does not support video generation` | Ganti `NVIDIA_MODEL` ke model video-capable (cari di NVIDIA NIM catalog) |
+| Port 8000 sudah dipakai | Ubah `APP_PORT=8080` di `.env` |
+| `python: command not found` | Install Python 3.11+ dan tambahkan ke PATH |
+| DB corrupt | Hapus `data/ugcora.db` dan jalankan ulang; akan dibuat lagi |
 
 ## License
-
 Private project. Not for distribution.
