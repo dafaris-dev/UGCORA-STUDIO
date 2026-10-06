@@ -54,7 +54,20 @@ VIDEO_PROVIDERS: List[Dict[str, Any]] = [
      "models": ["nvidia/cosmos-1", "nvidia/cosmos-vid-1"],
      "fields": [{"name": "base_url", "label": "Base URL", "kind": "text",
                  "default": "https://integrate.api.nvidia.com/v1"}],
-     "help": "NIM gateway. build.nvidia.com. Beberapa model free tier."},
+     "help": "Model video Cosmos resmi NVIDIA. Beberapa model free tier."},
+    {"key": "nvidia_build", "name": "NVIDIA Build (NIM — model lain)",
+     "models": None,  # user types model id manually
+     "fields": [
+         {"name": "model_id", "label": "Model ID (copy dari halaman model di build.nvidia.com)",
+          "kind": "text", "placeholder": "mis: meta/llama-3.3-70b-instruct, stabilityai/stable-video-diffusion"},
+         {"name": "base_url", "label": "Base URL", "kind": "text",
+          "default": "https://integrate.api.nvidia.com/v1"},
+     ],
+     "help": ('🔗 <a href="https://build.nvidia.com/" target="_blank">build.nvidia.com</a> — '
+              'daftar gratis pakai akun developer NVIDIA. Setiap halaman model punya '
+              '<strong>"Get API Key"</strong> (ambil key sekali, dipakai untuk semua model). '
+              'Pilih model apa aja (video, image, audio, LLM) dan copy <em>model id</em>-nya ke kolom di atas. '
+              'Free tier: 1,000 credits per akun, cukup buat testing.')},
     {"key": "runway", "name": "Runway", "badge": {"label": "PAID", "kind": "paid"},
      "models": ["gen4_turbo", "gen3a_turbo", "gen3a"],
      "help": "Kualitas text-to-video top. dev.runwayml.com."},

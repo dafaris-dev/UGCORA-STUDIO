@@ -63,6 +63,25 @@ FORM_OPTIONS = {
 }
 
 
+# Complete language list for the multi-select on Create Video
+LANGUAGES = [
+    "English", "Bahasa Indonesia", "Bahasa Melayu",
+    "Mandarin Chinese (普通话)", "Cantonese (廣東話)", "Taiwanese Hokkien",
+    "Japanese (日本語)", "Korean (한국어)",
+    "Vietnamese (Tiếng Việt)", "Thai (ภาษาไทย)", "Filipino / Tagalog", "Khmer (ភាសាខ្មែរ)",
+    "Spanish (Español)", "Portuguese (Brasil)", "Portuguese (Portugal)",
+    "French (Français)", "German (Deutsch)", "Italian (Italiano)",
+    "Dutch (Nederlands)", "Swedish (Svenska)", "Norwegian (Norsk)",
+    "Danish (Dansk)", "Finnish (Suomi)", "Polish (Polski)",
+    "Czech (Čeština)", "Hungarian (Magyar)", "Romanian (Română)",
+    "Greek (Ελληνικά)", "Russian (Русский)", "Ukrainian (Українська)",
+    "Turkish (Türkçe)", "Arabic (العربية)", "Hebrew (עברית)", "Persian / Farsi (فارسی)",
+    "Hindi (हिन्दी)", "Bengali (বাংলা)", "Urdu (اردو)", "Tamil (தமிழ்)", "Telugu (తెలుగు)",
+    "Swahili (Kiswahili)", "Yoruba", "Hausa", "Amharic (አማርኛ)", "Afrikaans",
+    "Zulu (isiZulu)", "Pidgin English (West Africa)",
+]
+
+
 # ─────────── Pages ───────────
 
 @router.get("/create", response_class=HTMLResponse, dependencies=[Depends(require_login)])
@@ -81,6 +100,7 @@ async def create_page(request: Request, db: Session = Depends(get_db),
     return templates.TemplateResponse(request, "create_video.html", {
         "request": request,
         "options": FORM_OPTIONS,
+        "languages": LANGUAGES,
         "products": products,
         "selected_product": product,
         "gemini_ready": gemini_ready,
@@ -245,6 +265,7 @@ async def api_create_generation(req: GenerateRequest, db: Session = Depends(get_
         setting=spec.get("setting", ""), lighting=spec.get("lighting", ""),
         style=spec.get("style", ""), aspect_ratio=aspect,
         extras=spec.get("extras", ""),
+        languages=", ".join(spec.get("languages", [])) if isinstance(spec.get("languages"), list) else (spec.get("languages", "") or ""),
         prompt=req.prompt, negative_prompt=req.negative_prompt,
         video_provider=video_provider, video_model=video_model,
         status="queued", progress=0,

@@ -115,6 +115,16 @@ def build_local_prompt(spec: Dict[str, Any], product: Dict[str, Any] | None = No
     if extras:
         body += f" Additional details: {extras}."
 
+    # Languages: spec["languages"] may be a list or a comma-string
+    raw_langs = spec.get("languages")
+    langs: list[str] = []
+    if isinstance(raw_langs, list):
+        langs = [str(l).strip() for l in raw_langs if l]
+    elif isinstance(raw_langs, str) and raw_langs.strip():
+        langs = [l.strip() for l in raw_langs.split(",") if l.strip()]
+    if langs:
+        body += f" The person speaks: {', '.join(langs)}."
+
     return f"{header}\n\n{body}"
 
 

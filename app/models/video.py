@@ -41,6 +41,7 @@ class Generation(Base):
     aspect_ratio    = Column(String(10), default="9:16")
     resolution      = Column(String(20), default="1080p")
     extras          = Column(Text, default="")
+    languages       = Column(Text, default="")  # comma-separated list of selected languages
 
     # ─── Script (optional) ───
     script_text     = Column(Text, default="")
